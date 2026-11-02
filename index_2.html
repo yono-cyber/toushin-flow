@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f5f6f3">
+<title>投信フローノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one-column phone app — sticky header, scrolling list, fixed bottom tab bar, full-screen detail sheet */
+:root{
+  padding-top:env(safe-area-inset-top,0px);
+  --bg:#f5f6f3; --surface:#ffffff; --line:#dfe2dc; --fg:#1d2420; --muted:#69726c;
+  --accent:#a06d14; --accent-soft:#f3e7cf;
+  --up:#c23a2b; --up-soft:#fbe7e4; --down:#2861a8; --down-soft:#e3ecf8;
+  --chip:#eceee9;
+  --f-body:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Yu Gothic",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --tabh:62px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121614; --surface:#1a1f1c; --line:#2c332f; --fg:#e8ece9; --muted:#97a19a;
+  --accent:#e0aa4c; --accent-soft:#3a2f1b;
+  --up:#ff7a69; --up-soft:#3b211d; --down:#6ea6ef; --down-soft:#1b2a3d; --chip:#242a26; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121614; --surface:#1a1f1c; --line:#2c332f; --fg:#e8ece9; --muted:#97a19a;
+  --accent:#e0aa4c; --accent-soft:#3a2f1b;
+  --up:#ff7a69; --up-soft:#3b211d; --down:#6ea6ef; --down-soft:#1b2a3d; --chip:#242a26; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 16px)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button{font:inherit;color:inherit}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.wrap{max-width:680px;margin:0 auto}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:14px 10px;display:grid;gap:10px}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.brand h1{white-space:nowrap;font-size:19px;margin:0;font-weight:700;letter-spacing:.02em}
+.brand .asof{font-size:11.5px;color:var(--muted);text-align:right;line-height:1.35}
+.search{position:relative}
+.search input{width:100%;font:inherit;font-size:16px;padding:11px 40px 11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
+.search input:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+.search .clr{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;width:32px;height:32px;color:var(--muted);cursor:pointer;font-size:18px}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chips.sub .chip{padding:4px 10px;font-size:12px}
+.chips.sub .chip[aria-pressed="true"]{background:var(--accent-soft);color:var(--fg);border-color:var(--accent)}
+.label{font-size:11.5px;color:var(--muted);letter-spacing:.06em}
+.sect-h{display:flex;justify-content:space-between;align-items:baseline;margin:14px 2px 6px;gap:8px}
+.sect-h h2{font-size:14px;margin:0;font-weight:700}
+.list{display:grid;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.row{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:11px 8px 11px 12px;border-top:1px solid var(--line);cursor:pointer;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0;width:100%}
+.row:first-child{border-top:0}
+.row:hover{background:var(--chip)}
+.row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.rk{font-family:var(--f-num);font-size:12px;color:var(--muted);min-width:1.8em;text-align:right}
+.rk.top{color:var(--accent);font-weight:600}
+.nm{min-width:0}
+.nm b{display:block;font-weight:700;font-size:14.5px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.nm small{display:block;color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.val{text-align:right;line-height:1.3}
+.val .main{font-size:14px;font-weight:600}
+.val .sub{font-size:11.5px}
+.up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--muted)}
+.star{border:0;background:none;width:36px;height:36px;border-radius:10px;cursor:pointer;color:var(--muted);display:grid;place-items:center}
+.star svg{width:20px;height:20px}
+.star[aria-pressed="true"]{color:var(--accent)}
+.star[aria-pressed="true"] svg path{fill:currentColor}
+.star:focus-visible{outline:2px solid var(--accent)}
+.empty{padding:28px 18px;text-align:center;color:var(--muted);font-size:14px;line-height:1.7}
+.more{display:block;margin:12px auto 0;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 18px;cursor:pointer;font-size:13px}
+.tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}
+.tag{font-size:10.5px;padding:1px 6px;border-radius:5px;background:var(--chip);color:var(--muted);white-space:nowrap}
+.tag.n{background:var(--accent-soft);color:var(--accent)}
+.sum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:4px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.tile .v{font-size:17px;font-weight:600;margin-top:2px}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
+nav.tabs .in{max-width:680px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);height:var(--tabh)}
+nav.tabs a{display:grid;place-items:center;align-content:center;gap:2px;text-decoration:none;color:var(--muted);font-size:11.5px;font-weight:500}
+nav.tabs a svg{width:23px;height:23px}
+nav.tabs a[aria-current="page"]{color:var(--fg)}
+nav.tabs a[aria-current="page"] svg{color:var(--accent)}
+nav.tabs a:focus-visible{outline:2px solid var(--accent);outline-offset:-4px;border-radius:10px}
+/* detail sheet */
+.sheet{position:fixed;inset:0;z-index:30;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sheet .bar{position:sticky;top:0;background:var(--bg);display:flex;justify-content:space-between;align-items:center;padding-block:8px;z-index:2}
+.back{border:0;background:none;display:flex;align-items:center;gap:4px;cursor:pointer;padding:8px 6px 8px 0;font-size:15px}
+.back svg{width:20px;height:20px}
+.d-title{font-size:20px;line-height:1.35;margin:6px 0 2px;text-wrap:balance}
+.d-sub{color:var(--muted);font-size:12.5px;line-height:1.5}
+.hero{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.hero .big{font-size:30px;font-weight:600;line-height:1.15;margin-top:2px}
+.hero .meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12.5px;color:var(--muted)}
+.hero .meta b{color:var(--fg);font-weight:600}
+.flows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.flow{border-radius:12px;padding:11px 12px;border:1px solid var(--line);background:var(--surface)}
+.flow.pos{background:var(--up-soft);border-color:transparent}
+.flow.neg{background:var(--down-soft);border-color:transparent}
+.flow .v{font-size:18px;font-weight:600;margin-top:2px}
+.flow .n{font-size:11px;color:var(--muted);margin-top:2px}
+.card{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 12px 8px}
+.card h3{font-size:13.5px;margin:0 0 6px}
+.chart svg{display:block;width:100%;height:auto}
+.chart text{fill:var(--muted);font-family:var(--f-num);font-size:10px}
+.tbl{overflow-x:auto}
+.tbl table{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th{font-weight:500;color:var(--muted);text-align:right;padding:6px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right}
+.note{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:10px}
+.note a,.card a{color:var(--accent)}
+.loading{padding:40px 0;text-align:center;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(16px);opacity:.6}to{transform:none;opacity:1}}}
+@media (min-width:560px){.flows{grid-template-columns:repeat(4,minmax(0,1fr))}.sum{grid-template-columns:repeat(4,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>投信フローノート</h1>
+      <div class="asof" id="asof">データ読み込み中…</div>
+    </div>
+    <div id="hdr-search" class="search">
+      <input id="q" type="search" inputmode="search" autocomplete="off" placeholder="ファンド名・愛称・運用会社で検索" aria-label="ファンドを検索">
+      <button class="clr" id="qclr" type="button" aria-label="検索語を消す" hidden>×</button>
+    </div>
+    <div id="hdr-rank" hidden>
+      <div class="chips" id="rank-kind" role="group" aria-label="ランキングの種類"></div>
+    </div>
+    <div class="chips sub" id="nisa" role="group" aria-label="NISAの区分"></div>
+  </header>
+
+  <main id="view"><div class="loading">ファンドデータを読み込んでいます…</div></main>
+</div>
+
+<nav class="tabs" aria-label="画面切り替え"><div class="in">
+  <a href="#search" data-tab="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>検索</a>
+  <a href="#fav" data-tab="fav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z"/></svg>お気に入り</a>
+  <a href="#rank" data-tab="rank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V12M12 20V5M19 20v-5"/></svg>ランキング</a>
+</div></nav>
+
+<div id="sheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="d-title"></div>
+
+<script>
+(() => {
+const STAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z"/></svg>';
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LS = { get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch{ return d; } },
+             set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} } };
+
+let FUNDS = [], BYID = new Map(), META = null;
+const state = { tab:'search', q:'', nisa: LS.get('nisa','all'), rank: LS.get('rank','na'), limit:50, fav: new Set(LS.get('fav', [])), favSort: LS.get('favSort','na') };
+
+// ---- formatting (単位: 百万円) ----
+function money(m, sign=false){
+  if (m == null || isNaN(m)) return '—';
+  const s = m < 0 ? '−' : (sign && m > 0 ? '+' : '');
+  const a = Math.abs(m);
+  let t;
+  if (a >= 1e6) t = (a/1e6).toFixed(2) + '兆円';
+  else if (a >= 1e5) t = Math.round(a/100).toLocaleString('ja-JP') + '億円';
+  else if (a >= 100) t = (a/100).toLocaleString('ja-JP',{maximumFractionDigits:1, minimumFractionDigits:1}) + '億円';
+  else t = (Math.round(a*10)/10).toLocaleString('ja-JP') + '百万円';
+  return s + t;
+}
+const cls = v => v == null ? 'flat' : v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
+const pct = v => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(2) + '%';
+const yen = v => v == null ? '—' : Math.round(v).toLocaleString('ja-JP') + '円';
+
+// ---- search normalisation: 全角/半角・カタカナ/ひらがな・大文字小文字を同一視 ----
+function norm(s){
+  return (s || '').normalize('NFKC').toLowerCase()
+    .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
+    .replace(/[\s・･\-‐―－ー《》（）()「」『』\[\]【】,，.。、]/g, '');
+}
+
+// ---- rankings ----
+const RANKS = [
+  {k:'na',  label:'純資産総額', v:f=>f.na,  dir:-1, fmt:f=>money(f.na), sub:f=>flowSub('前日', f.d1)},
+  {k:'d1',  label:'資金流入(日次)', v:f=>f.d1, dir:-1, fmt:f=>money(f.d1,true), sub:f=>'純資産 '+money(f.na), flow:true},
+  {k:'w1',  label:'資金流入(1週間)', v:f=>f.w1, dir:-1, fmt:f=>money(f.w1,true), sub:f=>'純資産 '+money(f.na), flow:true},
+  {k:'m1',  label:'資金流入(1ヶ月)', v:f=>f.m1, dir:-1, fmt:f=>money(f.m1,true), sub:f=>'純資産 '+money(f.na), flow:true},
+  {k:'m1o', label:'資金流出(1ヶ月)', v:f=>f.m1, dir:1,  fmt:f=>money(f.m1,true), sub:f=>'純資産 '+money(f.na), flow:true},
+  {k:'d1o', label:'資金流出(日次)', v:f=>f.d1, dir:1,  fmt:f=>money(f.d1,true), sub:f=>'純資産 '+money(f.na), flow:true},
+  {k:'mOff',label:'前月の設定−解約', v:f=>f.mOff, dir:-1, fmt:f=>money(f.mOff,true), sub:f=>'協会公表・月次', flow:true},
+  {k:'r1y', label:'1年騰落率', v:f=>f.r1y, dir:-1, fmt:f=>pct(f.r1y), sub:f=>'純資産 '+money(f.na), pctv:true},
+  {k:'fee', label:'信託報酬が低い', v:f=>f.fee, dir:1, fmt:f=>f.fee==null?'—':f.fee.toFixed(3)+'%', sub:f=>'純資産 '+money(f.na), plain:true, minNa:1000},
+];
+const NISA = [{k:'all',label:'すべて'},{k:'tsumi',label:'NISA つみたて投資枠'},{k:'growth',label:'NISA 成長投資枠'}];
+function flowSub(lbl, v){ return `<span class="${cls(v)}">${lbl} ${money(v,true)}</span>`; }
+function nisaOk(f){ return state.nisa === 'all' || (state.nisa === 'tsumi' ? f.tsumi : f.growth); }
+
+// ---- favorites (この端末のブラウザに保存) ----
+function saveFav(){ LS.set('fav', [...state.fav]); }
+function toggleFav(id){
+  state.fav.has(id) ? state.fav.delete(id) : state.fav.add(id);
+  saveFav();
+  document.querySelectorAll(`.star[data-id="${CSS.escape(id)}"]`).forEach(b => b.setAttribute('aria-pressed', state.fav.has(id)));
+  if (state.tab === 'fav' && $('#sheet').hidden) render();
+}
+
+// ---- rows ----
+function rowHTML(f, rank, mainHTML, subHTML){
+  const nick = f.nick ? esc(f.nick) : esc(f.short || f.name);
+  const second = f.nick ? esc(f.name || f.short) : esc(f.co);
+  return `<div class="row" role="button" tabindex="0" data-open="${esc(f.id)}">
+    ${rank != null ? `<span class="rk${rank<=3?' top':''}">${rank}</span>` : '<span></span>'}
+    <span class="nm"><b>${nick}</b><small>${second}${f.nick ? ' ・ ' + esc(f.co) : ''}</small></span>
+    <span class="val"><span class="main num">${mainHTML}</span><br><span class="sub num">${subHTML}</span></span>
+    <button class="star" type="button" data-id="${esc(f.id)}" aria-pressed="${state.fav.has(f.id)}" aria-label="お気に入り">${STAR}</button>
+  </div>`;
+}
+const listHTML = rows => `<div class="list">${rows.join('')}</div>`;
+const moreBtn = (shown, total) => total > shown ? `<button class="more" type="button" data-more>さらに表示（残り ${(total-shown).toLocaleString()} 本）</button>` : '';
+
+// ---- views ----
+function viewSearch(){
+  const q = norm(state.q);
+  let arr = FUNDS.filter(nisaOk), title;
+  if (q) {
+    const terms = state.q.normalize('NFKC').split(/\s+/).map(norm).filter(Boolean);
+    arr = arr.filter(f => terms.every(t => f._k.includes(t)));
+    arr.sort((a,b) => score(b,q) - score(a,q) || (b.na||0) - (a.na||0));
+    title = `「${esc(state.q)}」の検索結果 ${arr.length.toLocaleString()} 本`;
+  } else {
+    arr = arr.slice().sort((a,b) => (b.na||0) - (a.na||0));
+    title = '純資産の大きいファンド';
+  }
+  const shown = arr.slice(0, state.limit);
+  const body = shown.length ? listHTML(shown.map(f => rowHTML(f, null, money(f.na), flowSub('前日', f.d1))))
+    : `<div class="list"><div class="empty">該当するファンドがありません。<br>愛称（例：オルカン）や正式名称の一部で探してみてください。</div></div>`;
+  return `<div class="sect-h"><h2>${title}</h2><span class="label">純資産 / 前日の資金流入</span></div>${body}${moreBtn(shown.length, arr.length)}`;
+}
+function score(f, q){
+  return (norm(f.nick) === q ? 50 : 0) + (norm(f.nick).startsWith(q) ? 20 : 0) + (f._kn.includes(q) ? 10 : 0) + (norm(f.short).startsWith(q) ? 8 : 0);
+}
+function viewFav(){
+  const arr = [...state.fav].map(id => BYID.get(id)).filter(Boolean).filter(nisaOk);
+  if (!state.fav.size) return `<div class="sect-h"><h2>お気に入り</h2></div><div class="list"><div class="empty">まだお気に入りがありません。<br>検索やランキングで ☆ を押すと、ここにまとめて表示されます。</div></div>`;
+  const key = {na:f=>f.na, d1:f=>f.d1, w1:f=>f.w1, m1:f=>f.m1}[state.favSort];
+  arr.sort((a,b) => (key(b) ?? -Infinity) - (key(a) ?? -Infinity));
+  const tot = k => arr.reduce((s,f) => s + (f[k] || 0), 0);
+  const sorts = [['na','純資産'],['d1','日次流入'],['w1','1週間'],['m1','1ヶ月']];
+  return `<div class="sum">
+      <div class="tile"><div class="label">合計純資産</div><div class="v num">${money(tot('na'))}</div></div>
+      <div class="tile"><div class="label">日次流入 計</div><div class="v num ${cls(tot('d1'))}">${money(tot('d1'),true)}</div></div>
+      <div class="tile"><div class="label">1週間流入 計</div><div class="v num ${cls(tot('w1'))}">${money(tot('w1'),true)}</div></div>
+      <div class="tile"><div class="label">1ヶ月流入 計</div><div class="v num ${cls(tot('m1'))}">${money(tot('m1'),true)}</div></div>
+    </div>
+    <div class="sect-h"><h2>お気に入り ${arr.length} 本</h2><span class="label">並び替え</span></div>
+      <div class="chips sub" style="margin-bottom:8px" role="group" aria-label="並び替え">${sorts.map(([k,l]) => `<button class="chip" type="button" data-favsort="${k}" aria-pressed="${state.favSort===k}">${l}</button>`).join('')}</div>
+    ${arr.length ? listHTML(arr.map(f => {
+      const k = state.favSort === 'na' ? 'd1' : state.favSort;
+      return rowHTML(f, null, state.favSort === 'na' ? money(f.na) : `<span class="${cls(f[k])}">${money(f[k], true)}</span>`,
+        state.favSort === 'na' ? flowSub('前日', f.d1) : '純資産 ' + money(f.na));
+    })) : '<div class="list"><div class="empty">この区分に該当するお気に入りはありません。</div></div>'}`;
+}
+function viewRank(){
+  const R = RANKS.find(r => r.k === state.rank) || RANKS[0];
+  let arr = FUNDS.filter(nisaOk).filter(f => R.v(f) != null && (!R.minNa || (f.na||0) >= R.minNa));
+  arr.sort((a,b) => R.dir * (R.v(a) - R.v(b)));
+  const shown = arr.slice(0, state.limit);
+  const rows = shown.map((f,i) => {
+    const v = R.v(f);
+    const main = R.plain ? R.fmt(f) : `<span class="${cls(v)}">${R.fmt(f)}</span>`;
+    return rowHTML(f, i+1, R.k === 'na' ? R.fmt(f) : main, R.sub(f));
+  });
+  const nisaLbl = NISA.find(n => n.k === state.nisa).label;
+  return `<div class="sect-h"><h2>${R.label}ランキング</h2><span class="label">${esc(nisaLbl)}・${arr.length.toLocaleString()} 本</span></div>
+    ${rows.length ? listHTML(rows) : '<div class="list"><div class="empty">集計できるデータがまだありません。</div></div>'}${moreBtn(shown.length, arr.length)}
+    ${R.flow ? '<p class="note">資金流入は日々の純資産総額と基準価額の変化から推計した値（純資産の増減のうち運用損益以外の部分）です。「前月の設定−解約」は投資信託協会が公表する月次の実績値です。</p>' : ''}`;
+}
+
+function render(){
+  document.querySelectorAll('nav.tabs a').forEach(a => a.dataset.tab === state.tab ? a.setAttribute('aria-current','page') : a.removeAttribute('aria-current'));
+  $('#hdr-search').hidden = state.tab !== 'search';
+  $('#hdr-rank').hidden = state.tab !== 'rank';
+  $('#nisa').innerHTML = NISA.map(n => `<button class="chip" type="button" data-nisa="${n.k}" aria-pressed="${state.nisa===n.k}">${n.label}</button>`).join('');
+  $('#rank-kind').innerHTML = RANKS.map(r => `<button class="chip" type="button" data-rank="${r.k}" aria-pressed="${state.rank===r.k}">${r.label}</button>`).join('');
+  if (!META) return;
+  $('#view').innerHTML = state.tab === 'fav' ? viewFav() : state.tab === 'rank' ? viewRank() : viewSearch();
+}
+
+// ---- detail ----
+const seriesCache = {};
+function shardOf(id){ let c = crc32(id); return String(c % 32).padStart(2,'0'); }
+function crc32(str){
+  const b = new TextEncoder().encode(str); let c = ~0;
+  for (const x of b){ c ^= x; for (let k=0;k<8;k++) c = (c >>> 1) ^ (0xEDB88320 & -(c & 1)); }
+  return (~c) >>> 0;
+}
+async function loadSeries(id){
+  const s = shardOf(id);
+  if (!seriesCache[s]) seriesCache[s] = fetch(`series/${s}.json?v=${encodeURIComponent(META.updated)}`).then(r => r.ok ? r.json() : {}).catch(() => ({}));
+  return (await seriesCache[s])[id] || [];
+}
+function flowCard(label, v, note){
+  return `<div class="flow ${v>0?'pos':v<0?'neg':''}"><div class="label">${label}</div><div class="v num ${cls(v)}">${money(v,true)}</div>${note?`<div class="n">${note}</div>`:''}</div>`;
+}
+function chartSVG(ser){
+  const pts = ser.filter(r => r[3] != null);
+  if (pts.length < 2) return '<div class="empty">日次の資金流入は履歴がたまると表示されます。</div>';
+  const W = 340, H = 150, L = 44, R = 6, T = 10, B = 22;
+  const max = Math.max(...pts.map(p => p[3]), 0), min = Math.min(...pts.map(p => p[3]), 0);
+  const span = (max - min) || 1, y = v => T + (max - v) / span * (H - T - B);
+  const bw = (W - L - R) / pts.length;
+  const ticks = [max, 0, min].filter((v,i,a) => a.indexOf(v) === i && (v === 0 || Math.abs(y(v) - y(0)) > 14));
+  let g = ticks.map(v => `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="${v===0?1.2:.8}"/><text x="${L-4}" y="${y(v)+3}" text-anchor="end">${shortMoney(v)}</text>`).join('');
+  g += pts.map((p,i) => { const y0 = y(0), y1 = y(p[3]); return `<rect x="${(L + i*bw + bw*.15).toFixed(1)}" y="${Math.min(y0,y1).toFixed(1)}" width="${(bw*.7).toFixed(1)}" height="${Math.max(1,Math.abs(y1-y0)).toFixed(1)}" fill="${p[3]>=0?'var(--up)':'var(--down)'}" rx="1"/>`; }).join('');
+  const lab = i => pts[i][0].slice(5).replace('-','/');
+  g += `<text x="${L}" y="${H-6}">${lab(0)}</text><text x="${W-R}" y="${H-6}" text-anchor="end">${lab(pts.length-1)}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="日次の資金流入の推移">${g}</svg>`;
+}
+function shortMoney(m){ const a = Math.abs(m); const s = m < 0 ? '−' : ''; return a >= 100 ? s + (a/100).toFixed(a >= 1000 ? 0 : 1) + '億' : s + Math.round(a) + '百万'; }
+
+async function openDetail(id){
+  const f = BYID.get(id); if (!f) return;
+  const sh = $('#sheet');
+  const tags = [f.tsumi ? '<span class="tag n">つみたて投資枠</span>' : '', f.growth ? '<span class="tag n">成長投資枠</span>' : ''].join('');
+  sh.innerHTML = `<div class="wrap">
+    <div class="bar"><button class="back" type="button" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>戻る</button>
+      <button class="star" type="button" data-id="${esc(f.id)}" aria-pressed="${state.fav.has(f.id)}" aria-label="お気に入り">${STAR}</button></div>
+    ${f.nick ? `<div class="label">愛称</div>` : ''}
+    <h2 class="d-title" id="d-title">${esc(f.nick || f.short || f.name)}</h2>
+    <div class="d-sub">${esc(f.name)}<br>${esc(f.co)}</div>
+    <div class="tags">${tags}</div>
+    <div class="hero">
+      <div class="label">純資産総額（${esc(f.date || META.asof)} 時点）</div>
+      <div class="big num">${money(f.na)}</div>
+      <div class="meta"><span>基準価額 <b class="num">${yen(f.nav)}</b></span><span>前日比 <b class="num ${cls(f.navChg)}">${pct(f.navChg)}</b></span><span>1年騰落率 <b class="num ${cls(f.r1y)}">${pct(f.r1y)}</b></span></div>
+    </div>
+    <div class="flows">
+      ${flowCard('日次の資金流入', f.d1, '直近1営業日')}
+      ${flowCard('1週間の資金流入', f.w1, '直近7日間の合計')}
+      ${flowCard('1ヶ月の資金流入', f.m1, '直近1ヶ月の合計')}
+      ${flowCard('前月の設定−解約', f.mOff, '協会公表の月次実績')}
+    </div>
+    <div class="card chart"><h3>日ごとの資金流入</h3><div id="d-chart"><div class="loading">読み込み中…</div></div></div>
+    <div class="card"><h3>日次データ</h3><div class="tbl" id="d-table"><div class="loading">読み込み中…</div></div></div>
+    <div class="card"><h3>ファンド情報</h3><dl class="kv">
+      <dt>運用会社</dt><dd>${esc(f.co)}</dd>
+      <dt>信託報酬（税込）</dt><dd class="num">${f.fee==null?'—':f.fee.toFixed(4).replace(/0+$/,'').replace(/\.$/,'')+'%'}</dd>
+      <dt>設定日</dt><dd class="num">${esc(f.ests || '—')}</dd>
+      <dt>ISIN</dt><dd class="num">${esc(f.id.split('_')[0])}</dd>
+    </dl>${f.url ? `<p class="note"><a href="${esc(f.url)}" target="_blank" rel="noopener">運用会社の資料を開く</a></p>` : ''}</div>
+    <p class="note">資金流入は「当日の純資産 −前日の純資産 ×（当日の基準価額＋分配金）÷前日の基準価額」で推計しています（単位は百万円から換算）。データ元：投資信託協会 投信総合検索ライブラリー。</p>
+  </div>`;
+  sh.hidden = false; sh.scrollTop = 0; document.body.style.overflow = 'hidden';
+  if (location.hash !== '#fund-' + f.id) history.pushState(null, '', '#fund-' + f.id);
+  const ser = await loadSeries(id);
+  if (sh.hidden) return;
+  $('#d-chart').innerHTML = chartSVG(ser);
+  const rows = ser.slice().reverse();
+  $('#d-table').innerHTML = rows.length ? `<table><thead><tr><th>日付</th><th>基準価額</th><th>純資産</th><th>資金流入</th></tr></thead><tbody>${
+    rows.map(r => `<tr><td class="num">${r[0].slice(5).replace('-','/')}</td><td class="num">${yen(r[1])}</td><td class="num">${money(r[2])}</td><td class="num ${cls(r[3])}">${r[3]==null?'—':money(r[3],true)}</td></tr>`).join('')
+  }</tbody></table>` : '<div class="empty">日次データはまだありません。</div>';
+}
+function closeDetail(fromPop){
+  const sh = $('#sheet'); if (sh.hidden) return;
+  sh.hidden = true; document.body.style.overflow = '';
+  if (!fromPop && location.hash.startsWith('#fund-')) history.back();
+  render();
+}
+
+// ---- routing / events ----
+function route(){
+  const h = location.hash.slice(1);
+  if (h.startsWith('fund-')) { if (META) openDetail(h.slice(5)); return; }
+  closeDetail(true);
+  state.tab = ['search','fav','rank'].includes(h) ? h : 'search';
+  state.limit = 50; render(); window.scrollTo(0,0);
+}
+window.addEventListener('hashchange', route);
+window.addEventListener('popstate', () => { if (!location.hash.startsWith('#fund-')) closeDetail(true); });
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('button,[data-open]'); if (!t) return;
+  if (t.classList.contains('star')) { e.stopPropagation(); toggleFav(t.dataset.id); return; }
+  if (t.dataset.open) return openDetail(t.dataset.open);
+  if (t.hasAttribute('data-close')) return closeDetail(false);
+  if (t.hasAttribute('data-more')) { state.limit += 100; return render(); }
+  if (t.dataset.nisa) { state.nisa = t.dataset.nisa; LS.set('nisa', state.nisa); state.limit = 50; return render(); }
+  if (t.dataset.rank) { state.rank = t.dataset.rank; LS.set('rank', state.rank); state.limit = 50; render(); t.scrollIntoView?.({inline:'center',block:'nearest'}); return; }
+  if (t.dataset.favsort) { state.favSort = t.dataset.favsort; LS.set('favSort', state.favSort); return render(); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDetail(false);
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-open]')) { e.preventDefault(); openDetail(e.target.dataset.open); }
+});
+let qt = null;
+$('#q').addEventListener('input', e => {
+  state.q = e.target.value; $('#qclr').hidden = !state.q;
+  clearTimeout(qt); qt = setTimeout(() => { state.limit = 50; render(); }, 120);
+});
+$('#qclr').addEventListener('click', () => { $('#q').value = ''; state.q = ''; $('#qclr').hidden = true; render(); $('#q').focus(); });
+
+// ---- load ----
+async function load(){
+  try{
+    const r = await fetch('funds.json?t=' + Date.now());
+    if (!r.ok) throw new Error(r.status);
+    META = await r.json();
+  }catch(e){
+    $('#asof').textContent = 'データ未取得';
+    $('#view').innerHTML = '<div class="list"><div class="empty">ファンドデータがまだ用意されていません。<br>毎日22時の自動更新後に表示されます。</div></div>';
+    return;
+  }
+  const c = META.cols, ix = Object.fromEntries(c.map((k,i) => [k,i]));
+  FUNDS = META.rows.map(r => {
+    const f = { id:r[ix.id], name:r[ix.name], short:r[ix.short], nick:r[ix.nick], co:r[ix.co], na:r[ix.na], nav:r[ix.nav], navChg:r[ix.navChg],
+      d1:r[ix.d1], w1:r[ix.w1], m1:r[ix.m1], mOff:r[ix.mOff], r1y:r[ix.r1y], fee:r[ix.fee], tsumi:!!r[ix.tsumitate], growth:!!r[ix.growth],
+      date:r[ix.date], ests:r[ix.ests], url:r[ix.url] };
+    f._kn = norm(f.nick); f._k = norm([f.nick, f.short, f.name, f.co].join(' '));
+    return f;
+  });
+  BYID = new Map(FUNDS.map(f => [f.id, f]));
+  $('#asof').innerHTML = `基準日 <span class="num">${esc(META.asof)}</span>・${META.count.toLocaleString()}本<br>更新 <span class="num">${esc(META.updated.slice(5))}</span>`;
+  route();
+}
+render(); load();
+})();
+</script>
+
+</body>
+</html>
