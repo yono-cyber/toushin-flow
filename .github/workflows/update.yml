@@ -1,0 +1,65 @@
+name: 投信データ更新
+
+on:
+  schedule:
+    - cron: "30 12 * * *"   # 毎日 21:30 JST 開始（GitHub側の混雑で数十分遅れることがあるため早めに設定）
+  workflow_dispatch:         # 手動実行ボタン
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 前回までの履歴を復元
+        uses: actions/cache/restore@v4
+        with:
+          path: cache/hist.json
+          key: hist-${{ github.run_id }}
+          restore-keys: hist-
+
+      - name: データ取得
+        run: |
+          mkdir -p cache site
+          python update.py --hist cache/hist.json --out site
+          mv site/hist.json cache/hist.json
+          cp index.html site/
+
+      - name: 履歴を保存
+        uses: actions/cache/save@v4
+        with:
+          path: cache/hist.json
+          key: hist-${{ github.run_id }}
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: 更新日時を記録（自動実行の停止防止）
+        run: |
+          python -c "import json;print(json.load(open('site/funds.json'))['updated'])" > last-update.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
+          git add last-update.txt
+          git commit -m "データ更新 $(cat last-update.txt)" || true
+          git push || true
