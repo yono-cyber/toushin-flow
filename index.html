@@ -142,7 +142,7 @@ nav.tabs a:focus-visible{outline:2px solid var(--accent);outline-offset:-4px;bor
     <div id="hdr-rank" hidden>
       <div class="chips" id="rank-kind" role="group" aria-label="ランキングの種類"></div>
     </div>
-    <div class="chips sub" id="nisa" role="group" aria-label="NISAの区分"></div>
+    <div class="chips sub" id="nisa" role="group" aria-label="対象の絞り込み"></div>
   </header>
 
   <main id="view"><div class="loading">ファンドデータを読み込んでいます…</div></main>
@@ -165,7 +165,7 @@ const LS = { get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.
              set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} } };
 
 let FUNDS = [], BYID = new Map(), META = null;
-const state = { tab:'search', q:'', nisa: LS.get('nisa','all'), rank: LS.get('rank','na'), limit:50, fav: new Set(LS.get('fav', [])), favSort: LS.get('favSort','na') };
+const state = { tab:'search', q:'', nisa: LS.get('nisa2','fund'), rank: LS.get('rank','na'), limit:50, fav: new Set(LS.get('fav', [])), favSort: LS.get('favSort','na') };
 
 // ---- formatting (単位: 百万円) ----
 function money(m, sign=false){
@@ -202,9 +202,9 @@ const RANKS = [
   {k:'r1y', label:'1年騰落率', v:f=>f.r1y, dir:-1, fmt:f=>pct(f.r1y), sub:f=>'純資産 '+money(f.na), pctv:true},
   {k:'fee', label:'信託報酬が低い', v:f=>f.fee, dir:1, fmt:f=>f.fee==null?'—':f.fee.toFixed(3)+'%', sub:f=>'純資産 '+money(f.na), plain:true, minNa:1000},
 ];
-const NISA = [{k:'all',label:'すべて'},{k:'tsumi',label:'NISA つみたて投資枠'},{k:'growth',label:'NISA 成長投資枠'}];
+const NISA = [{k:'fund',label:'投信（ETF除く）'},{k:'all',label:'ETF含むすべて'},{k:'tsumi',label:'NISA つみたて投資枠'},{k:'growth',label:'NISA 成長投資枠'}];
 function flowSub(lbl, v){ return `<span class="${cls(v)}">${lbl} ${money(v,true)}</span>`; }
-function nisaOk(f){ return state.nisa === 'all' || (state.nisa === 'tsumi' ? f.tsumi : f.growth); }
+function nisaOk(f){ if (state.nisa === 'fund') return !f.etf; return state.nisa === 'all' || (state.nisa === 'tsumi' ? f.tsumi : f.growth); }
 
 // ---- favorites (この端末のブラウザに保存) ----
 function saveFav(){ LS.set('fav', [...state.fav]); }
@@ -305,10 +305,10 @@ function crc32(str){
   for (const x of b){ c ^= x; for (let k=0;k<8;k++) c = (c >>> 1) ^ (0xEDB88320 & -(c & 1)); }
   return (~c) >>> 0;
 }
+let SERIES = null;
 async function loadSeries(id){
-  const s = shardOf(id);
-  if (!seriesCache[s]) seriesCache[s] = fetch(`series/${s}.json?v=${encodeURIComponent(META.updated)}`).then(r => r.ok ? r.json() : {}).catch(() => ({}));
-  return (await seriesCache[s])[id] || [];
+  if (!SERIES) SERIES = fetch(`series.json?v=${encodeURIComponent(META.updated)}`).then(r => r.ok ? r.json() : {}).catch(() => ({}));
+  return (await SERIES)[id] || [];
 }
 function flowCard(label, v, note){
   return `<div class="flow ${v>0?'pos':v<0?'neg':''}"><div class="label">${label}</div><div class="v num ${cls(v)}">${money(v,true)}</div>${note?`<div class="n">${note}</div>`:''}</div>`;
@@ -359,7 +359,7 @@ async function openDetail(id){
       <dt>設定日</dt><dd class="num">${esc(f.ests || '—')}</dd>
       <dt>ISIN</dt><dd class="num">${esc(f.id.split('_')[0])}</dd>
     </dl>${f.url ? `<p class="note"><a href="${esc(f.url)}" target="_blank" rel="noopener">運用会社の資料を開く</a></p>` : ''}</div>
-    <p class="note">資金流入は「当日の純資産 −前日の純資産 ×（当日の基準価額＋分配金）÷前日の基準価額」で推計しています（単位は百万円から換算）。データ元：投資信託協会 投信総合検索ライブラリー。</p>
+    <p class="note">資金流入は「当日の純資産 − 前日の純資産 × 当日の基準価額 ÷ 前日の基準価額」で推計しています（分配金の支払いは流出に含めません）。データ元：投資信託協会 投信総合検索ライブラリー。</p>
   </div>`;
   sh.hidden = false; sh.scrollTop = 0; document.body.style.overflow = 'hidden';
   if (location.hash !== '#fund-' + f.id) history.pushState(null, '', '#fund-' + f.id);
@@ -395,7 +395,7 @@ document.addEventListener('click', e => {
   if (t.dataset.open) return openDetail(t.dataset.open);
   if (t.hasAttribute('data-close')) return closeDetail(false);
   if (t.hasAttribute('data-more')) { state.limit += 100; return render(); }
-  if (t.dataset.nisa) { state.nisa = t.dataset.nisa; LS.set('nisa', state.nisa); state.limit = 50; return render(); }
+  if (t.dataset.nisa) { state.nisa = t.dataset.nisa; LS.set('nisa2', state.nisa); state.limit = 50; return render(); }
   if (t.dataset.rank) { state.rank = t.dataset.rank; LS.set('rank', state.rank); state.limit = 50; render(); t.scrollIntoView?.({inline:'center',block:'nearest'}); return; }
   if (t.dataset.favsort) { state.favSort = t.dataset.favsort; LS.set('favSort', state.favSort); return render(); }
 });
@@ -418,14 +418,14 @@ async function load(){
     META = await r.json();
   }catch(e){
     $('#asof').textContent = 'データ未取得';
-    $('#view').innerHTML = '<div class="list"><div class="empty">ファンドデータがまだ用意されていません。<br>毎日22時の自動更新後に表示されます。</div></div>';
+    $('#view').innerHTML = '<div class="list"><div class="empty">ファンドデータがまだ用意されていません。<br>更新後に表示されます。</div></div>';
     return;
   }
   const c = META.cols, ix = Object.fromEntries(c.map((k,i) => [k,i]));
   FUNDS = META.rows.map(r => {
     const f = { id:r[ix.id], name:r[ix.name], short:r[ix.short], nick:r[ix.nick], co:r[ix.co], na:r[ix.na], nav:r[ix.nav], navChg:r[ix.navChg],
       d1:r[ix.d1], w1:r[ix.w1], m1:r[ix.m1], mOff:r[ix.mOff], r1y:r[ix.r1y], fee:r[ix.fee], tsumi:!!r[ix.tsumitate], growth:!!r[ix.growth],
-      date:r[ix.date], ests:r[ix.ests], url:r[ix.url] };
+      date:r[ix.date], ests:r[ix.ests], url:r[ix.url], etf:!!r[ix.etf] };
     f._kn = norm(f.nick); f._k = norm([f.nick, f.short, f.name, f.co].join(' '));
     return f;
   });
