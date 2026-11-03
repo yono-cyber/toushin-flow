@@ -30,7 +30,7 @@
 *{box-sizing:border-box}
 html,body{margin:0}
 [hidden]{display:none!important}
-body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5;
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.5;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
   padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 16px)}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
@@ -45,6 +45,14 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .search input{width:100%;font:inherit;font-size:16px;padding:11px 40px 11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
 .search input:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
 .search .clr{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;width:32px;height:32px;color:var(--muted);cursor:pointer;font-size:18px}
+.ctrls{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.sel{position:relative;display:block}
+.sel select{width:100%;appearance:none;-webkit-appearance:none;font:inherit;font-size:16px;font-weight:500;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 40px 11px 14px;min-height:46px;cursor:pointer}
+.sel.main select{font-weight:700;border-color:var(--accent);background:var(--accent-soft)}
+.sel::after{content:"";position:absolute;right:16px;top:50%;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+.sel select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.sel .cap{position:absolute;left:14px;top:4px;font-size:10.5px;color:var(--muted);pointer-events:none}
+.sel.cap-on select{padding-top:18px;padding-bottom:6px}
 .chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
@@ -55,20 +63,28 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .sect-h{display:flex;justify-content:space-between;align-items:baseline;margin:14px 2px 6px;gap:8px}
 .sect-h h2{font-size:14px;margin:0;font-weight:700}
 .list{display:grid;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.row{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:11px 8px 11px 12px;border-top:1px solid var(--line);cursor:pointer;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0;width:100%}
+.row{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:13px 4px 13px 12px;border-top:1px solid var(--line);cursor:pointer;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0;width:100%}
 .row:first-child{border-top:0}
 .row:hover{background:var(--chip)}
 .row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rk{font-family:var(--f-num);font-size:12px;color:var(--muted);min-width:1.8em;text-align:right}
 .rk.top{color:var(--accent);font-weight:600}
 .nm{min-width:0}
-.nm b{display:block;font-weight:700;font-size:14.5px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.nm small{display:block;color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nm b{display:block;font-weight:700;font-size:15px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.nm small{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.nm .metric{display:inline-block;margin-top:5px;font-size:12.5px;padding:2px 8px;border-radius:6px;background:var(--chip);color:var(--fg);max-width:100%;line-height:1.45}
+.nm .metric b{font-weight:600}
+.nm .metric .k{color:var(--muted);margin-right:4px}
+.px{text-align:right;line-height:1.25;min-width:92px}
+.px .p{font-size:16px;font-weight:600}
+.px .p small{font-size:11px;font-weight:500;color:var(--muted);margin-left:1px}
+.px .c{font-size:12.5px;margin-top:3px;font-weight:600}
+.px .r{font-size:11.5px}
 .val{text-align:right;line-height:1.3}
 .val .main{font-size:14px;font-weight:600}
 .val .sub{font-size:11.5px}
 .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--muted)}
-.star{border:0;background:none;width:36px;height:36px;border-radius:10px;cursor:pointer;color:var(--muted);display:grid;place-items:center}
+.star{border:0;background:none;width:40px;height:44px;border-radius:10px;cursor:pointer;color:var(--muted);display:grid;place-items:center}
 .star svg{width:20px;height:20px}
 .star[aria-pressed="true"]{color:var(--accent)}
 .star[aria-pressed="true"] svg path{fill:currentColor}
@@ -99,7 +115,10 @@ nav.tabs a:focus-visible{outline:2px solid var(--accent);outline-offset:-4px;bor
 .d-title{font-size:20px;line-height:1.35;margin:6px 0 2px;text-wrap:balance}
 .d-sub{color:var(--muted);font-size:12.5px;line-height:1.5}
 .hero{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
-.hero .big{font-size:30px;font-weight:600;line-height:1.15;margin-top:2px}
+.hero .big{font-size:32px;font-weight:600;line-height:1.15;margin-top:2px}
+.hero .chg{font-size:17px;font-weight:600;margin-top:4px}
+.hero .na{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.hero .na b{font-size:19px;font-weight:600}
 .hero .meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12.5px;color:var(--muted)}
 .hero .meta b{color:var(--fg);font-weight:600}
 .flows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
@@ -139,10 +158,10 @@ nav.tabs a:focus-visible{outline:2px solid var(--accent);outline-offset:-4px;bor
       <input id="q" type="search" inputmode="search" autocomplete="off" placeholder="ファンド名・愛称・運用会社で検索" aria-label="ファンドを検索">
       <button class="clr" id="qclr" type="button" aria-label="検索語を消す" hidden>×</button>
     </div>
-    <div id="hdr-rank" hidden>
-      <div class="chips" id="rank-kind" role="group" aria-label="ランキングの種類"></div>
+    <div class="ctrls">
+      <label class="sel main cap-on" id="hdr-rank" hidden><span class="cap">ランキングの種類</span><select id="rank-kind" aria-label="ランキングの種類"></select></label>
+      <label class="sel cap-on"><span class="cap">対象</span><select id="nisa" aria-label="対象の絞り込み"></select></label>
     </div>
-    <div class="chips sub" id="nisa" role="group" aria-label="対象の絞り込み"></div>
   </header>
 
   <main id="view"><div class="loading">ファンドデータを読み込んでいます…</div></main>
@@ -192,15 +211,17 @@ function norm(s){
 
 // ---- rankings ----
 const RANKS = [
-  {k:'na',  label:'純資産総額', v:f=>f.na,  dir:-1, fmt:f=>money(f.na), sub:f=>flowSub('前日', f.d1)},
-  {k:'d1',  label:'資金流入(日次)', v:f=>f.d1, dir:-1, fmt:f=>money(f.d1,true), sub:f=>'純資産 '+money(f.na), flow:true},
-  {k:'w1',  label:'資金流入(1週間)', v:f=>f.w1, dir:-1, fmt:f=>money(f.w1,true), sub:f=>'純資産 '+money(f.na), flow:true},
-  {k:'m1',  label:'資金流入(1ヶ月)', v:f=>f.m1, dir:-1, fmt:f=>money(f.m1,true), sub:f=>'純資産 '+money(f.na), flow:true},
-  {k:'m1o', label:'資金流出(1ヶ月)', v:f=>f.m1, dir:1,  fmt:f=>money(f.m1,true), sub:f=>'純資産 '+money(f.na), flow:true},
-  {k:'d1o', label:'資金流出(日次)', v:f=>f.d1, dir:1,  fmt:f=>money(f.d1,true), sub:f=>'純資産 '+money(f.na), flow:true},
-  {k:'mOff',label:'前月の設定−解約', v:f=>f.mOff, dir:-1, fmt:f=>money(f.mOff,true), sub:f=>'協会公表・月次', flow:true},
-  {k:'r1y', label:'1年騰落率', v:f=>f.r1y, dir:-1, fmt:f=>pct(f.r1y), sub:f=>'純資産 '+money(f.na), pctv:true},
-  {k:'fee', label:'信託報酬が低い', v:f=>f.fee, dir:1, fmt:f=>f.fee==null?'—':f.fee.toFixed(3)+'%', sub:f=>'純資産 '+money(f.na), plain:true, minNa:1000},
+  {k:'na', short:'純資産',  label:'純資産総額（大きい順）', v:f=>f.na,  dir:-1, fmt:f=>money(f.na), sub:f=>flowSub('前日', f.d1)},
+  {k:'d1', short:'日次流入',  label:'資金流入(日次)', v:f=>f.d1, dir:-1, fmt:f=>money(f.d1,true), sub:f=>'純資産 '+money(f.na), flow:true},
+  {k:'w1', short:'1週間流入',  label:'資金流入(1週間)', v:f=>f.w1, dir:-1, fmt:f=>money(f.w1,true), sub:f=>'純資産 '+money(f.na), flow:true},
+  {k:'m1', short:'1ヶ月流入',  label:'資金流入(1ヶ月)', v:f=>f.m1, dir:-1, fmt:f=>money(f.m1,true), sub:f=>'純資産 '+money(f.na), flow:true},
+  {k:'m1o', short:'1ヶ月流入', label:'資金流出(1ヶ月)', v:f=>f.m1, dir:1,  fmt:f=>money(f.m1,true), sub:f=>'純資産 '+money(f.na), flow:true},
+  {k:'d1o', short:'日次流入', label:'資金流出(日次)', v:f=>f.d1, dir:1,  fmt:f=>money(f.d1,true), sub:f=>'純資産 '+money(f.na), flow:true},
+  {k:'mOff', short:'前月設定−解約',label:'前月の設定−解約', v:f=>f.mOff, dir:-1, fmt:f=>money(f.mOff,true), sub:f=>'協会公表・月次', flow:true},
+  {k:'up1', label:'基準価額の値上がり率（前日比）', v:f=>f.navChg, dir:-1, fmt:f=>pct(f.navChg), sub:f=>''},
+  {k:'dn1', label:'基準価額の値下がり率（前日比）', v:f=>f.navChg, dir:1, fmt:f=>pct(f.navChg), sub:f=>''},
+  {k:'r1y', short:'1年騰落率', label:'1年騰落率', v:f=>f.r1y, dir:-1, fmt:f=>pct(f.r1y), sub:f=>'純資産 '+money(f.na), pctv:true},
+  {k:'fee', short:'信託報酬', label:'信託報酬が低い', v:f=>f.fee, dir:1, fmt:f=>f.fee==null?'—':f.fee.toFixed(3)+'%', sub:f=>'純資産 '+money(f.na), plain:true, minNa:1000},
 ];
 const NISA = [{k:'fund',label:'投信（ETF除く）'},{k:'all',label:'ETF含むすべて'},{k:'tsumi',label:'NISA つみたて投資枠'},{k:'growth',label:'NISA 成長投資枠'}];
 function flowSub(lbl, v){ return `<span class="${cls(v)}">${lbl} ${money(v,true)}</span>`; }
@@ -216,13 +237,20 @@ function toggleFav(id){
 }
 
 // ---- rows ----
-function rowHTML(f, rank, mainHTML, subHTML){
+function arrow(v){ return v > 0 ? '▲' : v < 0 ? '▼' : '±'; }
+function yenDiff(v){ return v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('ja-JP') + '円'; }
+function priceHTML(f){
+  return `<span class="px num"><span class="p">${f.nav==null?'—':Math.round(f.nav).toLocaleString('ja-JP')+'<small>円</small>'}</span>
+    <span class="c ${cls(f.navChg)}" style="display:block">${f.navChg==null?'—':arrow(f.navChg)+' '+yenDiff(f.navDiff)}</span>
+    <span class="r ${cls(f.navChg)}" style="display:block">${pct(f.navChg)}</span></span>`;
+}
+function rowHTML(f, rank, metricLabel, metricHTML){
   const nick = f.nick ? esc(f.nick) : esc(f.short || f.name);
-  const second = f.nick ? esc(f.name || f.short) : esc(f.co);
+  const second = f.nick ? esc(f.co) : esc(f.co);
   return `<div class="row" role="button" tabindex="0" data-open="${esc(f.id)}">
     ${rank != null ? `<span class="rk${rank<=3?' top':''}">${rank}</span>` : '<span></span>'}
-    <span class="nm"><b>${nick}</b><small>${second}${f.nick ? ' ・ ' + esc(f.co) : ''}</small></span>
-    <span class="val"><span class="main num">${mainHTML}</span><br><span class="sub num">${subHTML}</span></span>
+    <span class="nm"><b>${nick}</b><small>${second}</small>${metricLabel ? `<span class="metric"><span class="k">${metricLabel}</span><b class="num">${metricHTML}</b></span>` : ''}</span>
+    ${priceHTML(f)}
     <button class="star" type="button" data-id="${esc(f.id)}" aria-pressed="${state.fav.has(f.id)}" aria-label="お気に入り">${STAR}</button>
   </div>`;
 }
@@ -243,9 +271,9 @@ function viewSearch(){
     title = '純資産の大きいファンド';
   }
   const shown = arr.slice(0, state.limit);
-  const body = shown.length ? listHTML(shown.map(f => rowHTML(f, null, money(f.na), flowSub('前日', f.d1))))
+  const body = shown.length ? listHTML(shown.map(f => rowHTML(f, null, '純資産', money(f.na))))
     : `<div class="list"><div class="empty">該当するファンドがありません。<br>愛称（例：オルカン）や正式名称の一部で探してみてください。</div></div>`;
-  return `<div class="sect-h"><h2>${title}</h2><span class="label">純資産 / 前日の資金流入</span></div>${body}${moreBtn(shown.length, arr.length)}`;
+  return `<div class="sect-h"><h2>${title}</h2><span class="label">基準価額 / 前日比</span></div>${body}${moreBtn(shown.length, arr.length)}`;
 }
 function score(f, q){
   return (norm(f.nick) === q ? 50 : 0) + (norm(f.nick).startsWith(q) ? 20 : 0) + (f._kn.includes(q) ? 10 : 0) + (norm(f.short).startsWith(q) ? 8 : 0);
@@ -253,22 +281,22 @@ function score(f, q){
 function viewFav(){
   const arr = [...state.fav].map(id => BYID.get(id)).filter(Boolean).filter(nisaOk);
   if (!state.fav.size) return `<div class="sect-h"><h2>お気に入り</h2></div><div class="list"><div class="empty">まだお気に入りがありません。<br>検索やランキングで ☆ を押すと、ここにまとめて表示されます。</div></div>`;
-  const key = {na:f=>f.na, d1:f=>f.d1, w1:f=>f.w1, m1:f=>f.m1}[state.favSort];
+  const key = ({na:f=>f.na, chg:f=>f.navChg, d1:f=>f.d1, w1:f=>f.w1, m1:f=>f.m1})[state.favSort] || (f=>f.na);
   arr.sort((a,b) => (key(b) ?? -Infinity) - (key(a) ?? -Infinity));
   const tot = k => arr.reduce((s,f) => s + (f[k] || 0), 0);
-  const sorts = [['na','純資産'],['d1','日次流入'],['w1','1週間'],['m1','1ヶ月']];
+  const sorts = [['na','純資産の大きい順'],['chg','前日比（値上がり順）'],['d1','資金流入（日次）'],['w1','資金流入（1週間）'],['m1','資金流入（1ヶ月）']];
   return `<div class="sum">
       <div class="tile"><div class="label">合計純資産</div><div class="v num">${money(tot('na'))}</div></div>
       <div class="tile"><div class="label">日次流入 計</div><div class="v num ${cls(tot('d1'))}">${money(tot('d1'),true)}</div></div>
       <div class="tile"><div class="label">1週間流入 計</div><div class="v num ${cls(tot('w1'))}">${money(tot('w1'),true)}</div></div>
       <div class="tile"><div class="label">1ヶ月流入 計</div><div class="v num ${cls(tot('m1'))}">${money(tot('m1'),true)}</div></div>
     </div>
-    <div class="sect-h"><h2>お気に入り ${arr.length} 本</h2><span class="label">並び替え</span></div>
-      <div class="chips sub" style="margin-bottom:8px" role="group" aria-label="並び替え">${sorts.map(([k,l]) => `<button class="chip" type="button" data-favsort="${k}" aria-pressed="${state.favSort===k}">${l}</button>`).join('')}</div>
+    <div class="sect-h"><h2>お気に入り ${arr.length} 本</h2><span class="label">基準価額 / 前日比</span></div>
+      <label class="sel cap-on" style="margin-bottom:8px"><span class="cap">並び替え</span><select id="favsort" aria-label="並び替え">${sorts.map(([k,l]) => `<option value="${k}"${state.favSort===k?' selected':''}>${l}</option>`).join('')}</select></label>
     ${arr.length ? listHTML(arr.map(f => {
-      const k = state.favSort === 'na' ? 'd1' : state.favSort;
-      return rowHTML(f, null, state.favSort === 'na' ? money(f.na) : `<span class="${cls(f[k])}">${money(f[k], true)}</span>`,
-        state.favSort === 'na' ? flowSub('前日', f.d1) : '純資産 ' + money(f.na));
+      const k = ['d1','w1','m1'].includes(state.favSort) ? state.favSort : null;
+      const lbl = {d1:'日次流入', w1:'1週間流入', m1:'1ヶ月流入'}[k];
+      return k ? rowHTML(f, null, lbl, `<span class="${cls(f[k])}">${money(f[k], true)}</span>`) : rowHTML(f, null, '純資産', money(f.na));
     })) : '<div class="list"><div class="empty">この区分に該当するお気に入りはありません。</div></div>'}`;
 }
 function viewRank(){
@@ -278,11 +306,12 @@ function viewRank(){
   const shown = arr.slice(0, state.limit);
   const rows = shown.map((f,i) => {
     const v = R.v(f);
-    const main = R.plain ? R.fmt(f) : `<span class="${cls(v)}">${R.fmt(f)}</span>`;
-    return rowHTML(f, i+1, R.k === 'na' ? R.fmt(f) : main, R.sub(f));
+    if (R.k === 'up1' || R.k === 'dn1') return rowHTML(f, i+1, '純資産', money(f.na));
+    const main = (R.plain || R.k === 'na') ? R.fmt(f) : `<span class="${cls(v)}">${R.fmt(f)}</span>`;
+    return rowHTML(f, i+1, R.short, main);
   });
   const nisaLbl = NISA.find(n => n.k === state.nisa).label;
-  return `<div class="sect-h"><h2>${R.label}ランキング</h2><span class="label">${esc(nisaLbl)}・${arr.length.toLocaleString()} 本</span></div>
+  return `<div class="sect-h"><h2>${R.label}</h2><span class="label">${esc(nisaLbl)}・${arr.length.toLocaleString()} 本</span></div>
     ${rows.length ? listHTML(rows) : '<div class="list"><div class="empty">集計できるデータがまだありません。</div></div>'}${moreBtn(shown.length, arr.length)}
     ${R.flow ? '<p class="note">資金流入は日々の純資産総額と基準価額の変化から推計した値（純資産の増減のうち運用損益以外の部分）です。「前月の設定−解約」は投資信託協会が公表する月次の実績値です。</p>' : ''}`;
 }
@@ -291,8 +320,9 @@ function render(){
   document.querySelectorAll('nav.tabs a').forEach(a => a.dataset.tab === state.tab ? a.setAttribute('aria-current','page') : a.removeAttribute('aria-current'));
   $('#hdr-search').hidden = state.tab !== 'search';
   $('#hdr-rank').hidden = state.tab !== 'rank';
-  $('#nisa').innerHTML = NISA.map(n => `<button class="chip" type="button" data-nisa="${n.k}" aria-pressed="${state.nisa===n.k}">${n.label}</button>`).join('');
-  $('#rank-kind').innerHTML = RANKS.map(r => `<button class="chip" type="button" data-rank="${r.k}" aria-pressed="${state.rank===r.k}">${r.label}</button>`).join('');
+  if (!$('#nisa').options.length) $('#nisa').innerHTML = NISA.map(n => `<option value="${n.k}">${n.label}</option>`).join('');
+  if (!$('#rank-kind').options.length) $('#rank-kind').innerHTML = RANKS.map(r => `<option value="${r.k}">${r.label}</option>`).join('');
+  $('#nisa').value = state.nisa; $('#rank-kind').value = state.rank;
   if (!META) return;
   $('#view').innerHTML = state.tab === 'fav' ? viewFav() : state.tab === 'rank' ? viewRank() : viewSearch();
 }
@@ -341,9 +371,11 @@ async function openDetail(id){
     <div class="d-sub">${esc(f.name)}<br>${esc(f.co)}</div>
     <div class="tags">${tags}</div>
     <div class="hero">
-      <div class="label">純資産総額（${esc(f.date || META.asof)} 時点）</div>
-      <div class="big num">${money(f.na)}</div>
-      <div class="meta"><span>基準価額 <b class="num">${yen(f.nav)}</b></span><span>前日比 <b class="num ${cls(f.navChg)}">${pct(f.navChg)}</b></span><span>1年騰落率 <b class="num ${cls(f.r1y)}">${pct(f.r1y)}</b></span></div>
+      <div class="label">基準価額（${esc(f.date || META.asof)}）</div>
+      <div class="big num">${yen(f.nav)}</div>
+      <div class="chg num ${cls(f.navChg)}">前日比 ${f.navChg==null?'—':arrow(f.navChg)+' '+yenDiff(f.navDiff)+'（'+pct(f.navChg)+'）'}</div>
+      <div class="na"><span class="label">純資産総額</span><b class="num">${money(f.na)}</b></div>
+      <div class="meta"><span>1年騰落率 <b class="num ${cls(f.r1y)}">${pct(f.r1y)}</b></span></div>
     </div>
     <div class="flows">
       ${flowCard('日次の資金流入', f.d1, '直近1営業日')}
@@ -399,6 +431,12 @@ document.addEventListener('click', e => {
   if (t.dataset.rank) { state.rank = t.dataset.rank; LS.set('rank', state.rank); state.limit = 50; render(); t.scrollIntoView?.({inline:'center',block:'nearest'}); return; }
   if (t.dataset.favsort) { state.favSort = t.dataset.favsort; LS.set('favSort', state.favSort); return render(); }
 });
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'nisa') { state.nisa = t.value; LS.set('nisa2', state.nisa); state.limit = 50; render(); window.scrollTo(0,0); }
+  else if (t.id === 'rank-kind') { state.rank = t.value; LS.set('rank', state.rank); state.limit = 50; render(); window.scrollTo(0,0); }
+  else if (t.id === 'favsort') { state.favSort = t.value; LS.set('favSort', state.favSort); render(); }
+});
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeDetail(false);
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-open]')) { e.preventDefault(); openDetail(e.target.dataset.open); }
@@ -425,7 +463,8 @@ async function load(){
   FUNDS = META.rows.map(r => {
     const f = { id:r[ix.id], name:r[ix.name], short:r[ix.short], nick:r[ix.nick], co:r[ix.co], na:r[ix.na], nav:r[ix.nav], navChg:r[ix.navChg],
       d1:r[ix.d1], w1:r[ix.w1], m1:r[ix.m1], mOff:r[ix.mOff], r1y:r[ix.r1y], fee:r[ix.fee], tsumi:!!r[ix.tsumitate], growth:!!r[ix.growth],
-      date:r[ix.date], ests:r[ix.ests], url:r[ix.url], etf:!!r[ix.etf] };
+      date:r[ix.date], ests:r[ix.ests], url:r[ix.url], etf:!!r[ix.etf], navDiff: ix.navDiff != null ? r[ix.navDiff] : null };
+    if (f.navDiff == null && f.nav != null && f.navChg != null) f.navDiff = f.nav - f.nav / (1 + f.navChg/100);
     f._kn = norm(f.nick); f._k = norm([f.nick, f.short, f.name, f.co].join(' '));
     return f;
   });
