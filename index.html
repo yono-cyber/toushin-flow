@@ -123,6 +123,24 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .pf .big{font-size:28px;font-weight:600;line-height:1.2}
 .pf .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
 .pf .grid .v{font-size:15px;font-weight:600}
+.nm .acct{display:inline-block;font-size:11.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:5px;padding:1px 7px;margin-bottom:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row.idx .nm b{font-size:15.5px}
+.mv{display:grid;gap:4px}
+.mv button{width:44px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--bg);cursor:pointer;font-size:13px;color:var(--fg)}
+.mv button:active{background:var(--accent-soft)}
+.fav-ctrl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-bottom:8px}
+.fav-ctrl .reo{min-height:46px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
+.reo-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:12px;padding:8px 8px 8px 14px;margin-bottom:8px;font-size:13px}
+.reo-bar .done{white-space:nowrap;flex:none;min-height:40px;padding:0 18px;border-radius:10px;border:0;background:var(--fg);color:var(--bg);font-weight:700;cursor:pointer}
+.hf{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;background:var(--bg)}
+.hf-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.hf-n{font-weight:700;font-size:13px;color:var(--accent)}
+.hf-del{border:0;background:none;color:var(--muted);font-size:12.5px;cursor:pointer;padding:6px 0 6px 8px;text-decoration:underline}
+.hold label.full{display:grid;margin-bottom:8px}
+.hold .hf input{background:var(--surface)}
+.hold .add{width:100%;min-height:46px;border-radius:12px;border:1.5px dashed var(--accent);background:var(--surface);color:var(--fg);font-weight:700;cursor:pointer;margin-top:2px}
+.hf .saved{margin:6px 0 0;font-size:13px;font-weight:700;color:var(--accent);min-height:1.1em}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 12px);z-index:40;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:13.5px;max-width:calc(100% - 32px);box-shadow:0 4px 16px rgba(0,0,0,.2)}
 .sum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:4px}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .tile .v{font-size:17px;font-weight:600;margin-top:2px}
@@ -184,12 +202,12 @@ nav.tabs a:focus-visible{outline:2px solid var(--accent);outline-offset:-4px;bor
       <div class="asof" id="asof">データ読み込み中…</div>
     </div>
     <div id="hdr-search" class="search">
-      <input id="q" type="search" inputmode="search" autocomplete="off" placeholder="ファンド名・愛称・運用会社で検索" aria-label="ファンドを検索">
+      <input id="q" type="search" inputmode="search" autocomplete="off" placeholder="ファンド名・愛称・指数名で検索" aria-label="ファンドを検索">
       <button class="clr" id="qclr" type="button" aria-label="検索語を消す" hidden>×</button>
     </div>
     <div class="ctrls">
       <label class="sel main cap-on" id="hdr-rank" hidden><span class="cap">ランキングの種類</span><select id="rank-kind" aria-label="ランキングの種類"></select></label>
-      <label class="sel cap-on"><span class="cap">対象</span><select id="nisa" aria-label="対象の絞り込み"></select></label>
+      <label class="sel cap-on" id="hdr-nisa"><span class="cap">対象</span><select id="nisa" aria-label="対象の絞り込み"></select></label>
     </div>
   </header>
 
@@ -213,8 +231,17 @@ const LS = { get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.
              set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return JSON.stringify(JSON.parse(localStorage.getItem(k))) === JSON.stringify(v); }catch{ return false; } } };
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch{}
 
-let FUNDS = [], BYID = new Map(), META = null;
-const state = { tab:'search', q:'', nisa: LS.get('nisa2','fund'), rank: LS.get('rank','na'), limit:50, fav: new Set(LS.get('fav', [])), hold: LS.get('hold', {}), favSort: LS.get('favSort','na') };
+let FUNDS = [], IDX = [], BYID = new Map(), META = null;
+const newE = () => 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+// お気に入り＝「エントリー」の並び。同じファンドを口座ごとに複数持てる。
+function loadList(){
+  const l = LS.get('list', null);
+  if (Array.isArray(l)) return l;
+  const fav = LS.get('fav', []), hold = LS.get('hold', {});      // 旧形式から移行
+  return fav.map(id => ({ e: newE(), id, acct: '', amt: hold[id]?.amt || null, cost: hold[id]?.cost || null }));
+}
+const state = { tab:'search', q:'', nisa: LS.get('nisa2','fund'), rank: LS.get('rank','na'), limit:50,
+  list: loadList(), favSort: LS.get('favSort2','my'), reorder: false };
 
 // ---- formatting (単位: 百万円) ----
 function money(m, sign=false){
@@ -232,66 +259,94 @@ const cls = v => v == null ? 'flat' : v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
 const pct = v => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(2) + '%';
 const yen = v => v == null ? '—' : Math.round(v).toLocaleString('ja-JP') + '円';
 const yenS = v => v == null || isNaN(v) ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(Math.round(v)).toLocaleString('ja-JP') + '円';
-// ---- 保有（購入金額）: この端末に保存 ----
+const numD = (v, d) => v == null ? '—' : v.toLocaleString('ja-JP', {minimumFractionDigits:d, maximumFractionDigits:d});
+const numS = (v, d) => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '±') + numD(Math.abs(v), d);
+function arrow(v){ return v > 0 ? '▲' : v < 0 ? '▼' : '±'; }
+function yenDiff(v){ return v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('ja-JP') + '円'; }
+
+// ---- 保有（購入金額） ----
 function holdCalc(f, h){
-  if (!f || !h || !h.amt || !h.cost || f.nav == null) return null;
+  if (!f || f.kind === 'idx' || !h || !h.amt || !h.cost || f.nav == null) return null;
   const val = h.amt * f.nav / h.cost;
   const pl = val - h.amt;
   const day = f.navChg == null ? null : val - val / (1 + f.navChg / 100);
   return { amt: h.amt, cost: h.cost, val, pl, plPct: pl / h.amt * 100, day };
 }
-function saveHold(){ const ok = LS.set('hold', state.hold); if (window.__syncStore) window.__syncStore(); return ok; }
+const isFav = id => state.list.some(x => x.id === id);
+const entriesOf = id => state.list.filter(x => x.id === id);
+const entry = e => state.list.find(x => x.e === e);
+function acctLabel(en){
+  if (en.acct) return en.acct;
+  const same = entriesOf(en.id);
+  return same.length > 1 ? '口座' + (same.indexOf(en) + 1) : '';
+}
 
 // ---- search normalisation: 全角/半角・カタカナ/ひらがな・大文字小文字を同一視 ----
 function norm(s){
   return (s || '').normalize('NFKC').toLowerCase()
     .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
-    .replace(/[\s・･\-‐―－ー《》（）()「」『』\[\]【】,，.。、]/g, '');
+    .replace(/[\s・･\-‐―－ー《》（）()「」『』\[\]【】,，.。、&＆]/g, '');
 }
 
 // ---- rankings ----
 const RANKS = [
-  {k:'na', short:'純資産',  label:'純資産総額（大きい順）', v:f=>f.na,  dir:-1, fmt:f=>money(f.na), sub:f=>flowSub('前日', f.d1)},
-  {k:'d1', short:'日次流入',  label:'資金流入(日次)', v:f=>f.d1, dir:-1, fmt:f=>money(f.d1,true), sub:f=>'純資産 '+money(f.na), flow:true},
-  {k:'w1', short:'1週間流入',  label:'資金流入(1週間)', v:f=>f.w1, dir:-1, fmt:f=>money(f.w1,true), sub:f=>'純資産 '+money(f.na), flow:true},
-  {k:'m1', short:'1ヶ月流入',  label:'資金流入(1ヶ月)', v:f=>f.m1, dir:-1, fmt:f=>money(f.m1,true), sub:f=>'純資産 '+money(f.na), flow:true},
-  {k:'m1o', short:'1ヶ月流入', label:'資金流出(1ヶ月)', v:f=>f.m1, dir:1,  fmt:f=>money(f.m1,true), sub:f=>'純資産 '+money(f.na), flow:true},
-  {k:'d1o', short:'日次流入', label:'資金流出(日次)', v:f=>f.d1, dir:1,  fmt:f=>money(f.d1,true), sub:f=>'純資産 '+money(f.na), flow:true},
-  {k:'mOff', short:'前月設定−解約',label:'前月の設定−解約', v:f=>f.mOff, dir:-1, fmt:f=>money(f.mOff,true), sub:f=>'協会公表・月次', flow:true},
-  {k:'up1', label:'基準価額の値上がり率（前日比）', v:f=>f.navChg, dir:-1, fmt:f=>pct(f.navChg), sub:f=>''},
-  {k:'dn1', label:'基準価額の値下がり率（前日比）', v:f=>f.navChg, dir:1, fmt:f=>pct(f.navChg), sub:f=>''},
-  {k:'r1y', short:'1年騰落率', label:'1年騰落率', v:f=>f.r1y, dir:-1, fmt:f=>pct(f.r1y), sub:f=>'純資産 '+money(f.na), pctv:true},
-  {k:'fee', short:'信託報酬', label:'信託報酬が低い', v:f=>f.fee, dir:1, fmt:f=>f.fee==null?'—':f.fee.toFixed(3)+'%', sub:f=>'純資産 '+money(f.na), plain:true, minNa:1000},
+  {k:'na', short:'純資産',  label:'純資産総額（大きい順）', v:f=>f.na,  dir:-1, fmt:f=>money(f.na)},
+  {k:'d1', short:'日次流入',  label:'資金流入(日次)', v:f=>f.d1, dir:-1, fmt:f=>money(f.d1,true), flow:true},
+  {k:'w1', short:'1週間流入',  label:'資金流入(1週間)', v:f=>f.w1, dir:-1, fmt:f=>money(f.w1,true), flow:true},
+  {k:'m1', short:'1ヶ月流入',  label:'資金流入(1ヶ月)', v:f=>f.m1, dir:-1, fmt:f=>money(f.m1,true), flow:true},
+  {k:'m1o', short:'1ヶ月流入', label:'資金流出(1ヶ月)', v:f=>f.m1, dir:1,  fmt:f=>money(f.m1,true), flow:true},
+  {k:'d1o', short:'日次流入', label:'資金流出(日次)', v:f=>f.d1, dir:1,  fmt:f=>money(f.d1,true), flow:true},
+  {k:'mOff', short:'前月設定−解約',label:'前月の設定−解約', v:f=>f.mOff, dir:-1, fmt:f=>money(f.mOff,true), flow:true},
+  {k:'up1', label:'基準価額の値上がり率（前日比）', v:f=>f.navChg, dir:-1, fmt:f=>pct(f.navChg)},
+  {k:'dn1', label:'基準価額の値下がり率（前日比）', v:f=>f.navChg, dir:1, fmt:f=>pct(f.navChg)},
+  {k:'r1y', short:'1年騰落率', label:'1年騰落率', v:f=>f.r1y, dir:-1, fmt:f=>pct(f.r1y)},
+  {k:'fee', short:'信託報酬', label:'信託報酬が低い', v:f=>f.fee, dir:1, fmt:f=>f.fee==null?'—':f.fee.toFixed(3)+'%', plain:true, minNa:1000},
 ];
 const NISA = [{k:'fund',label:'投信（ETF除く）'},{k:'all',label:'ETF含むすべて'},{k:'tsumi',label:'NISA つみたて投資枠'},{k:'growth',label:'NISA 成長投資枠'}];
-function flowSub(lbl, v){ return `<span class="${cls(v)}">${lbl} ${money(v,true)}</span>`; }
 function nisaOk(f){ if (state.nisa === 'fund') return !f.etf; return state.nisa === 'all' || (state.nisa === 'tsumi' ? f.tsumi : f.growth); }
 
-// ---- favorites (この端末のブラウザに保存) ----
-function saveFav(){ LS.set('fav', [...state.fav]); }
+// ---- 保存（このブラウザ＋Claude上ではアカウントにも） ----
+let favDoc = null, favTimer = null;
+function saveList(){
+  const ok = LS.set('list', state.list);
+  if (favDoc){ clearTimeout(favTimer); favTimer = setTimeout(() => { favDoc.set({list: state.list, at: Date.now()}).catch(()=>{}); }, 400); }
+  return ok;
+}
+function syncStars(id){ document.querySelectorAll(`.star[data-id="${CSS.escape(id)}"]`).forEach(b => b.setAttribute('aria-pressed', isFav(id))); }
 function toggleFav(id){
-  state.fav.has(id) ? state.fav.delete(id) : state.fav.add(id);
-  saveFav();
-  document.querySelectorAll(`.star[data-id="${CSS.escape(id)}"]`).forEach(b => b.setAttribute('aria-pressed', state.fav.has(id)));
+  if (!isFav(id)) { state.list.push({e:newE(), id, acct:'', amt:null, cost:null}); saveList(); syncStars(id); if (state.tab === 'fav' && $('#sheet').hidden) render(); return; }
+  if (entriesOf(id).some(x => x.amt)) { toast('購入金額が入っているので、外すときは詳細画面の「この口座を削除」から消してください。'); if ($('#sheet').hidden) openDetail(id); return; }
+  state.list = state.list.filter(x => x.id !== id); saveList(); syncStars(id);
   if (state.tab === 'fav' && $('#sheet').hidden) render();
+}
+function toast(msg){
+  let t = $('#toast'); if (!t){ t = document.createElement('div'); t.id = 'toast'; t.setAttribute('role','status'); document.body.appendChild(t); }
+  t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => { t.hidden = true; }, 3500);
 }
 
 // ---- rows ----
-function arrow(v){ return v > 0 ? '▲' : v < 0 ? '▼' : '±'; }
-function yenDiff(v){ return v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('ja-JP') + '円'; }
-function priceHTML(f){
+function priceHTML(f, en){
+  if (f.kind === 'idx') return `<span class="px num"><span class="p">${numD(f.last, f.dec)}<small>${f.unit === 'pt' ? '' : f.unit}</small></span>
+    <span class="c ${cls(f.chg)}" style="display:block">${arrow(f.chg)} ${numS(f.chg, f.dec)}</span>
+    <span class="r ${cls(f.chg)}" style="display:block">${pct(f.chgPct)}</span></span>`;
+  const c = en ? holdCalc(f, en) : null;
   return `<span class="px num"><span class="p">${f.nav==null?'—':Math.round(f.nav).toLocaleString('ja-JP')+'<small>円</small>'}</span>
     <span class="c ${cls(f.navChg)}" style="display:block">${f.navChg==null?'—':arrow(f.navChg)+' '+yenDiff(f.navDiff)}</span>
-    <span class="r ${cls(f.navChg)}" style="display:block">${pct(f.navChg)}</span>${(() => { const c = holdCalc(f, state.hold[f.id]); return c ? `<span class="hb"><span class="ha">購入 ${Math.round(c.amt).toLocaleString('ja-JP')}円</span><span class="hp ${cls(c.pl)}">${yenS(c.pl)}</span><span class="hr ${cls(c.pl)}">${pct(c.plPct)}</span></span>` : ''; })()}</span>`;
+    <span class="r ${cls(f.navChg)}" style="display:block">${pct(f.navChg)}</span>${c ? `<span class="hb"><span class="ha">購入 ${Math.round(c.amt).toLocaleString('ja-JP')}円</span><span class="hp ${cls(c.pl)}">${yenS(c.pl)}</span><span class="hr ${cls(c.pl)}">${pct(c.plPct)}</span></span>` : ''}</span>`;
 }
-function rowHTML(f, rank, metricLabel, metricHTML){
-  const nick = f.nick ? esc(f.nick) : esc(f.short || f.name);
-  const second = f.nick ? esc(f.co) : esc(f.co);
-  return `<div class="row" role="button" tabindex="0" data-open="${esc(f.id)}">
+function rowHTML(f, rank, metricLabel, metricHTML, en){
+  const idx = f.kind === 'idx';
+  const title = idx ? esc(f.name) : (f.nick ? esc(f.nick) : esc(f.short || f.name));
+  const second = idx ? `${f.date ? esc(f.date.slice(5).replace('-','/')) + ' 終値' : ''}` : esc(f.co);
+  const acct = en ? acctLabel(en) : '';
+  const tail = state.reorder && en
+    ? `<span class="mv"><button type="button" data-up="${esc(en.e)}" aria-label="上へ">▲</button><button type="button" data-down="${esc(en.e)}" aria-label="下へ">▼</button></span>`
+    : `<button class="star" type="button" data-id="${esc(f.id)}" aria-pressed="${isFav(f.id)}" aria-label="お気に入り">${STAR}</button>`;
+  return `<div class="row${idx ? ' idx' : ''}" role="button" tabindex="0" data-open="${esc(f.id)}">
     ${rank != null ? `<span class="rk${rank<=3?' top':''}">${rank}</span>` : '<span></span>'}
-    <span class="nm"><b>${nick}</b><small>${second}</small>${metricLabel ? `<span class="metric"><span class="k">${metricLabel}</span><b class="num">${metricHTML}</b></span>` : ''}</span>
-    ${priceHTML(f)}
-    <button class="star" type="button" data-id="${esc(f.id)}" aria-pressed="${state.fav.has(f.id)}" aria-label="お気に入り">${STAR}</button>
+    <span class="nm">${acct ? `<span class="acct">${esc(acct)}</span>` : ''}<b>${title}</b><small>${second}</small>${metricLabel ? `<span class="metric"><span class="k">${metricLabel}</span><b class="num">${metricHTML}</b></span>` : ''}</span>
+    ${priceHTML(f, en)}
+    ${tail}
   </div>`;
 }
 const listHTML = rows => `<div class="list">${rows.join('')}</div>`;
@@ -300,48 +355,45 @@ const moreBtn = (shown, total) => total > shown ? `<button class="more" type="bu
 // ---- views ----
 function viewSearch(){
   const q = norm(state.q);
-  let arr = FUNDS.filter(nisaOk), title;
-  if (q) {
-    const terms = state.q.normalize('NFKC').split(/\s+/).map(norm).filter(Boolean);
-    arr = arr.filter(f => terms.every(t => f._k.includes(t)));
-    arr.sort((a,b) => score(b,q) - score(a,q) || (b.na||0) - (a.na||0));
-    title = `「${esc(state.q)}」の検索結果 ${arr.length.toLocaleString()} 本`;
-  } else {
-    arr = arr.slice().sort((a,b) => (b.na||0) - (a.na||0));
-    title = '純資産の大きいファンド';
+  if (!q) {
+    const idx = IDX.length ? listHTML(IDX.map(x => rowHTML(x, null))) : '<div class="list"><div class="empty">指数のデータはまだありません。</div></div>';
+    return `<div class="sect-h"><h2>主な指数・為替</h2><span class="label">☆でお気に入りに追加できます</span></div>${idx}
+      <p class="note">ファンドは上の検索欄で、愛称（例：オルカン）や正式名称、運用会社名で探せます。</p>`;
   }
+  const terms = state.q.normalize('NFKC').split(/\s+/).map(norm).filter(Boolean);
+  const ix = IDX.filter(x => terms.every(t => x._k.includes(t)));
+  let arr = FUNDS.filter(nisaOk).filter(f => terms.every(t => f._k.includes(t)));
+  arr.sort((a,b) => score(b,q) - score(a,q) || (b.na||0) - (a.na||0));
   const shown = arr.slice(0, state.limit);
-  const body = shown.length ? listHTML(shown.map(f => rowHTML(f, null, '純資産', money(f.na))))
+  const body = (ix.length || shown.length) ? listHTML([...ix.map(x => rowHTML(x, null)), ...shown.map(f => rowHTML(f, null, '純資産', money(f.na)))])
     : `<div class="list"><div class="empty">該当するファンドがありません。<br>愛称（例：オルカン）や正式名称の一部で探してみてください。</div></div>`;
-  return `<div class="sect-h"><h2>${title}</h2><span class="label">基準価額 / 前日比</span></div>${body}${moreBtn(shown.length, arr.length)}`;
+  return `<div class="sect-h"><h2>「${esc(state.q)}」の検索結果 ${(arr.length + ix.length).toLocaleString()} 件</h2><span class="label">基準価額 / 前日比</span></div>${body}${moreBtn(shown.length, arr.length)}`;
 }
 function score(f, q){
   return (norm(f.nick) === q ? 50 : 0) + (norm(f.nick).startsWith(q) ? 20 : 0) + (f._kn.includes(q) ? 10 : 0) + (norm(f.short).startsWith(q) ? 8 : 0);
 }
 function viewFav(){
-  const arr = [...state.fav].map(id => BYID.get(id)).filter(Boolean).filter(nisaOk);
-  if (!state.fav.size && !Object.keys(state.hold).length) return `<div class="sect-h"><h2>お気に入り</h2></div><div class="list"><div class="empty">まだお気に入りがありません。<br>検索やランキングで ☆ を押すと、ここにまとめて表示されます。</div></div>${backupHTML()}`;
-  const key = ({pl:f=>holdCalc(f,state.hold[f.id])?.pl, na:f=>f.na, chg:f=>f.navChg, d1:f=>f.d1, w1:f=>f.w1, m1:f=>f.m1})[state.favSort] || (f=>f.na);
-  arr.sort((a,b) => (key(b) ?? -Infinity) - (key(a) ?? -Infinity));
-    const sorts = [['pl','損益の大きい順'],['na','純資産の大きい順'],['chg','前日比（値上がり順）'],['d1','資金流入（日次）'],['w1','資金流入（1週間）'],['m1','資金流入（1ヶ月）']];
-  const hs = arr.map(f => holdCalc(f, state.hold[f.id])).filter(Boolean);
+  const items = state.list.map(en => ({en, f: BYID.get(en.id)})).filter(x => x.f);
+  if (!items.length) return `<div class="sect-h"><h2>お気に入り</h2></div><div class="list"><div class="empty">まだお気に入りがありません。<br>検索・指数・ランキングで ☆ を押すと、ここにまとめて表示されます。</div></div>${backupHTML()}`;
+  const sorts = [['my','自分の並び順'],['pl','損益の大きい順'],['chg','前日比（値上がり順）'],['na','純資産の大きい順']];
+  const key = ({pl:x=>holdCalc(x.f,x.en)?.pl, chg:x=>x.f.kind==='idx'?x.f.chgPct:x.f.navChg, na:x=>x.f.na})[state.favSort];
+  const arr = key && !state.reorder ? items.slice().sort((a,b) => (key(b) ?? -Infinity) - (key(a) ?? -Infinity)) : items;
+  const hs = items.map(x => holdCalc(x.f, x.en)).filter(Boolean);
   const T = hs.reduce((a,h) => ({amt:a.amt+h.amt, val:a.val+h.val, day:a.day+(h.day||0)}), {amt:0,val:0,day:0});
   const pf = hs.length ? `<div class="pf">
-      <div class="label">保有中 ${hs.length} 本の評価損益（購入金額から）</div>
+      <div class="label">保有 ${hs.length} 件の評価損益（購入金額から）</div>
       <div class="top"><div class="big num ${cls(T.val-T.amt)}">${yenS(T.val-T.amt)}</div><div class="num ${cls(T.val-T.amt)}" style="font-weight:600">${pct((T.val-T.amt)/T.amt*100)}</div></div>
       <div class="grid">
         <div><div class="label">購入金額</div><div class="v num">${yen(T.amt)}</div></div>
         <div><div class="label">評価額</div><div class="v num">${yen(T.val)}</div></div>
         <div><div class="label">前日比</div><div class="v num ${cls(T.day)}">${yenS(T.day)}</div></div>
-      </div></div>` : `<p class="note" style="margin-top:0">ファンドの詳細画面で「購入金額」を入れると、ここに損益の合計が出ます。</p>`;
-  return `${pf}    <div class="sect-h"><h2>お気に入り ${arr.length} 本</h2><span class="label">基準価額 / 前日比</span></div>
-      <label class="sel cap-on" style="margin-bottom:8px"><span class="cap">並び替え</span><select id="favsort" aria-label="並び替え">${sorts.map(([k,l]) => `<option value="${k}"${state.favSort===k?' selected':''}>${l}</option>`).join('')}</select></label>
-    ${arr.length ? listHTML(arr.map(f => {
-      const hc = holdCalc(f, state.hold[f.id]);
-      const k = ['d1','w1','m1'].includes(state.favSort) ? state.favSort : null;
-      const lbl = {d1:'日次流入', w1:'1週間流入', m1:'1ヶ月流入'}[k];
-      return k ? rowHTML(f, null, lbl, `<span class="${cls(f[k])}">${money(f[k], true)}</span>`) : rowHTML(f, null, '純資産', money(f.na));
-    })) : '<div class="list"><div class="empty">この区分に該当するお気に入りはありません。</div></div>'}
+      </div></div>` : `<p class="note" style="margin-top:0">ファンドの詳細画面で「購入金額」を入れると、ここに損益の合計が出ます。同じファンドを別の口座でも持っていれば、口座ごとに追加できます。</p>`;
+  const ctrl = state.reorder
+    ? `<div class="reo-bar"><span>▲▼で並びを変えて「完了」を押してください</span><button type="button" class="done" data-reorder>完了</button></div>`
+    : `<div class="fav-ctrl"><label class="sel cap-on"><span class="cap">並び替え</span><select id="favsort" aria-label="並び替え">${sorts.map(([k,l]) => `<option value="${k}"${state.favSort===k?' selected':''}>${l}</option>`).join('')}</select></label>
+       <button type="button" class="reo" data-reorder>並びを変える</button></div>`;
+  return `${pf}<div class="sect-h"><h2>お気に入り ${items.length} 件</h2><span class="label">基準価額 / 前日比</span></div>${ctrl}
+    ${listHTML(arr.map(x => x.f.kind === 'idx' ? rowHTML(x.f, null, null, null, x.en) : rowHTML(x.f, null, null, null, x.en)))}
     ${backupHTML()}`;
 }
 function viewRank(){
@@ -365,6 +417,8 @@ function render(){
   document.querySelectorAll('nav.tabs a').forEach(a => a.dataset.tab === state.tab ? a.setAttribute('aria-current','page') : a.removeAttribute('aria-current'));
   $('#hdr-search').hidden = state.tab !== 'search';
   $('#hdr-rank').hidden = state.tab !== 'rank';
+  $('#hdr-nisa').hidden = state.tab === 'fav' || (state.tab === 'search' && !norm(state.q));
+  document.querySelector('.ctrls').hidden = $('#hdr-nisa').hidden && $('#hdr-rank').hidden;
   if (!$('#nisa').options.length) $('#nisa').innerHTML = NISA.map(n => `<option value="${n.k}">${n.label}</option>`).join('');
   if (!$('#rank-kind').options.length) $('#rank-kind').innerHTML = RANKS.map(r => `<option value="${r.k}">${r.label}</option>`).join('');
   $('#nisa').value = state.nisa; $('#rank-kind').value = state.rank;
@@ -402,6 +456,20 @@ function chartSVG(ser){
   g += `<text x="${L}" y="${H-6}">${lab(0)}</text><text x="${W-R}" y="${H-6}" text-anchor="end">${lab(pts.length-1)}</text>`;
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="日次の資金流入の推移">${g}</svg>`;
 }
+function lineSVG(ser, dec){
+  if (ser.length < 2) return '<div class="empty">推移はデータがたまると表示されます。</div>';
+  const W = 340, H = 160, L = 48, R = 8, T = 10, B = 22;
+  const vs = ser.map(p => p[1]), max = Math.max(...vs), min = Math.min(...vs), span = (max - min) || 1;
+  const x = i => L + i * (W - L - R) / (ser.length - 1), y = v => T + (max - v) / span * (H - T - B);
+  const d = ser.map((p,i) => `${i?'L':'M'}${x(i).toFixed(1)},${y(p[1]).toFixed(1)}`).join('');
+  const up = vs[vs.length-1] >= vs[0];
+  const col = up ? 'var(--up)' : 'var(--down)';
+  let g = [max, min].map(v => `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width=".8"/><text x="${L-4}" y="${y(v)+3}" text-anchor="end">${numD(v, v >= 1000 ? 0 : dec)}</text>`).join('');
+  g += `<path d="${d}L${x(ser.length-1).toFixed(1)},${H-B}L${L},${H-B}Z" fill="${col}" opacity=".10"/><path d="${d}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/>`;
+  g += `<circle cx="${x(ser.length-1)}" cy="${y(vs[vs.length-1])}" r="3.5" fill="${col}"/>`;
+  g += `<text x="${L}" y="${H-6}">${ser[0][0].slice(5).replace('-','/')}</text><text x="${W-R}" y="${H-6}" text-anchor="end">${ser[ser.length-1][0].slice(5).replace('-','/')}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="推移">${g}</svg>`;
+}
 function shortMoney(m){ const a = Math.abs(m); const s = m < 0 ? '−' : ''; return a >= 100 ? s + (a/100).toFixed(a >= 1000 ? 0 : 1) + '億' : s + Math.round(a) + '百万'; }
 
 function backupHTML(){
@@ -412,47 +480,68 @@ function backupHTML(){
     <button type="button" class="more" data-bkload>貼り付けたコードで復元</button>
     <p class="saved" id="bk-msg" role="status"></p></details>`;
 }
+const ACCTS = ['楽天証券','SBI証券','マネックス証券','松井証券','auカブコム証券','銀行','つみたてNISA','成長投資枠','特定口座','iDeCo'];
+function holdFormHTML(f, en, n){
+  return `<div class="hf" data-e="${esc(en.e)}">
+    <div class="hf-h"><span class="hf-n">保有 ${n}</span><button type="button" class="hf-del" data-del="${esc(en.e)}">この口座を削除</button></div>
+    <label class="full">口座・メモ（例：楽天証券 NISA）<input class="h-acct" type="text" list="acct-list" autocomplete="off" placeholder="例 楽天証券 NISA" value="${esc(en.acct || '')}"></label>
+    <div class="inrow">
+      <label>購入金額（合計）<input class="h-amt" type="text" inputmode="numeric" autocomplete="off" placeholder="例 1,000,000" value="${en.amt ? Math.round(en.amt).toLocaleString('ja-JP') : ''}"></label>
+      <label>買ったときの基準価額<input class="h-cost" type="text" inputmode="numeric" autocomplete="off" placeholder="例 37,100" value="${en.cost ? Math.round(en.cost).toLocaleString('ja-JP') : ''}"></label>
+    </div>
+    <div class="res">${holdResHTML(f, en)}</div>
+    <p class="saved" role="status">${en.amt && en.cost ? '✓ 保存済み' : ''}</p>
+  </div>`;
+}
 function holdCardHTML(f){
-  const h = state.hold[f.id] || {};
+  const ens = entriesOf(f.id);
   return `<div class="hold" id="hold" data-id="${esc(f.id)}">
     <h3>購入金額から損益を見る</h3>
-    <div class="inrow">
-      <label>購入金額（合計）<input id="h-amt" type="text" inputmode="numeric" autocomplete="off" placeholder="例 1,000,000" value="${h.amt ? Math.round(h.amt).toLocaleString('ja-JP') : ''}"></label>
-      <label>買ったときの基準価額<input id="h-cost" type="text" inputmode="numeric" autocomplete="off" placeholder="例 37,100" value="${h.cost ? Math.round(h.cost).toLocaleString('ja-JP') : ''}"></label>
-    </div>
-    <div class="res" id="h-res">${holdResHTML(f, h)}</div>
-    <div class="btns"><button class="save" type="button" data-holdsave>保存する</button>${h.amt ? '<button type="button" data-holddel>消す</button>' : ''}</div>
-    <p class="saved" id="h-ok" role="status">${h.amt ? '✓ 保存済み' : ''}</p>
-    <p class="hint" id="h-msg">例：100万円分を基準価額 37,100円 のときに買った → 購入金額に 1,000,000、買ったときの基準価額に 37,100。損益は毎日の基準価額で自動で動きます。何回かに分けて買った場合は、合計金額と証券会社の画面の「平均取得単価」を入れてください。<br>入力は自動で保存されます（このスマホのこのアプリ・ブラウザの中）。</p>
+    ${ens.map((en,i) => holdFormHTML(f, en, i+1)).join('') || '<p class="hint" style="margin-top:0">このファンドを持っていれば、購入金額を入れると毎日の損益が出ます。</p>'}
+    <button type="button" class="add" data-addhold>＋ ${ens.length ? '別の口座でも持っている（追加）' : '購入金額を入れる'}</button>
+    <datalist id="acct-list">${ACCTS.map(a => `<option value="${a}">`).join('')}</datalist>
+    <p class="hint">例：100万円分を基準価額 37,100円 のときに買った → 購入金額に 1,000,000、買ったときの基準価額に 37,100。損益は毎日の基準価額で自動で動きます。同じファンドを別の証券会社やNISAでも持っている場合は「追加」で口座ごとに入れられます。入力は自動で保存されます（このスマホのこのアプリ・ブラウザの中）。</p>
   </div>`;
 }
 function holdResHTML(f, h){
   const c = holdCalc(f, h);
-  if (!c) return `<div class="pl"><div class="label">損益</div><div class="v num flat" style="font-size:15px">購入金額と買ったときの基準価額を入れると表示されます（今日の基準価額 ${yen(f.nav)}）</div></div>`;
+  if (!c) return `<div class="pl"><div class="label">損益</div><div class="v num flat" style="font-size:14px">購入金額と買ったときの基準価額を入れると表示されます（今日の基準価額 ${yen(f.nav)}）</div></div>`;
   return `<div class="pl"><div class="label">損益（今日の基準価額 ${yen(f.nav)} で計算）</div><div class="v num ${cls(c.pl)}">${yenS(c.pl)}　<span style="font-size:17px">${pct(c.plPct)}</span></div></div>
     <div><div class="label">評価額</div><div class="v num">${yen(c.val)}</div></div>
     <div><div class="label">前日比</div><div class="v num ${cls(c.day)}">${yenS(c.day)}</div></div>`;
 }
-function doSaveHold(id, h, auto){
-  state.hold[id] = h;
-  const ok = saveHold();
-  if (!state.fav.has(id)){ state.fav.add(id); saveFav(); document.querySelectorAll(`.star[data-id="${CSS.escape(id)}"]`).forEach(b => b.setAttribute('aria-pressed', true)); }
-  const el = $('#h-ok'); if (!el) return;
-  el.textContent = ok ? (auto ? '✓ 自動で保存しました' : '✓ 保存しました。お気に入りに損益の合計が出ます') : '保存できませんでした。プライベートモードをやめて、普通のSafariかホーム画面のアイコンから開いてください。';
-}
 const toNum = v => { const n = parseFloat(String(v||'').normalize('NFKC').replace(/[,円\s]/g,'')); return isFinite(n) && n > 0 ? n : null; };
-function readHoldInputs(){ return { amt: toNum($('#h-amt')?.value), cost: toNum($('#h-cost')?.value) }; }
+
+function sheetTop(f, title, sub){
+  return `<div class="bar"><button class="back" type="button" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>戻る</button>
+      <button class="star" type="button" data-id="${esc(f.id)}" aria-pressed="${isFav(f.id)}" aria-label="お気に入り">${STAR}</button></div>
+    ${title}${sub}`;
+}
+function showSheet(html, id){
+  const sh = $('#sheet');
+  sh.innerHTML = `<div class="wrap">${html}</div>`;
+  sh.hidden = false; sh.scrollTop = 0; document.body.style.overflow = 'hidden';
+  if (location.hash !== '#fund-' + id) history.pushState(null, '', '#fund-' + id);
+}
+function openIndex(f){
+  const rows = f.series.slice().reverse().slice(0, 30);
+  showSheet(`${sheetTop(f, `<h2 class="d-title" id="d-title">${esc(f.name)}</h2>`, `<div class="d-sub">${esc(f.date)} 時点の終値</div>`)}
+    <div class="hero">
+      <div class="label">${esc(f.short)}</div>
+      <div class="big num">${numD(f.last, f.dec)}<small style="font-size:16px"> ${f.unit === 'pt' ? 'ポイント' : f.unit}</small></div>
+      <div class="chg num ${cls(f.chg)}">前日比 ${arrow(f.chg)} ${numS(f.chg, f.dec)}（${pct(f.chgPct)}）</div>
+    </div>
+    <div class="card chart"><h3>推移（直近${f.series.length}日）</h3>${lineSVG(f.series, f.dec)}</div>
+    <div class="card"><h3>日次データ</h3><div class="tbl"><table><thead><tr><th>日付</th><th>終値</th><th>前日比</th></tr></thead><tbody>${
+      rows.map((r,i) => { const p = rows[i+1]; const ch = p ? (r[1]/p[1]-1)*100 : null; return `<tr><td class="num">${r[0].slice(5).replace('-','/')}</td><td class="num">${numD(r[1], f.dec)}</td><td class="num ${cls(ch)}">${pct(ch)}</td></tr>`; }).join('')
+    }</tbody></table></div></div>
+    <p class="note">指数・為替は毎晩の更新時点の終値です（為替はその時点の値）。データ元：Yahoo!ファイナンス。</p>`, f.id);
+}
 async function openDetail(id){
   const f = BYID.get(id); if (!f) return;
-  const sh = $('#sheet');
+  if (f.kind === 'idx') return openIndex(f);
   const tags = [f.tsumi ? '<span class="tag n">つみたて投資枠</span>' : '', f.growth ? '<span class="tag n">成長投資枠</span>' : ''].join('');
-  sh.innerHTML = `<div class="wrap">
-    <div class="bar"><button class="back" type="button" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>戻る</button>
-      <button class="star" type="button" data-id="${esc(f.id)}" aria-pressed="${state.fav.has(f.id)}" aria-label="お気に入り">${STAR}</button></div>
-    ${f.nick ? `<div class="label">愛称</div>` : ''}
-    <h2 class="d-title" id="d-title">${esc(f.nick || f.short || f.name)}</h2>
-    <div class="d-sub">${esc(f.name)}<br>${esc(f.co)}</div>
-    <div class="tags">${tags}</div>
+  showSheet(`${sheetTop(f, `${f.nick ? `<div class="label">愛称</div>` : ''}<h2 class="d-title" id="d-title">${esc(f.nick || f.short || f.name)}</h2>`, `<div class="d-sub">${esc(f.name)}<br>${esc(f.co)}</div><div class="tags">${tags}</div>`)}
     <div class="hero">
       <div class="label">基準価額（${esc(f.date || META.asof)}）</div>
       <div class="big num">${yen(f.nav)}</div>
@@ -475,10 +564,8 @@ async function openDetail(id){
       <dt>設定日</dt><dd class="num">${esc(f.ests || '—')}</dd>
       <dt>ISIN</dt><dd class="num">${esc(f.id.split('_')[0])}</dd>
     </dl>${f.url ? `<p class="note"><a href="${esc(f.url)}" target="_blank" rel="noopener">運用会社の資料を開く</a></p>` : ''}</div>
-    <p class="note">資金流入は「当日の純資産 − 前日の純資産 × 当日の基準価額 ÷ 前日の基準価額」で推計しています（分配金の支払いは流出に含めません）。データ元：投資信託協会 投信総合検索ライブラリー。</p>
-  </div>`;
-  sh.hidden = false; sh.scrollTop = 0; document.body.style.overflow = 'hidden';
-  if (location.hash !== '#fund-' + f.id) history.pushState(null, '', '#fund-' + f.id);
+    <p class="note">資金流入は「当日の純資産 − 前日の純資産 × 当日の基準価額 ÷ 前日の基準価額」で推計しています（分配金の支払いは流出に含めません）。データ元：投資信託協会 投信総合検索ライブラリー。</p>`, f.id);
+  const sh = $('#sheet');
   const ser = await loadSeries(id);
   if (sh.hidden) return;
   $('#d-chart').innerHTML = chartSVG(ser);
@@ -487,6 +574,7 @@ async function openDetail(id){
     rows.map(r => `<tr><td class="num">${r[0].slice(5).replace('-','/')}</td><td class="num">${yen(r[1])}</td><td class="num">${money(r[2])}</td><td class="num ${cls(r[3])}">${r[3]==null?'—':money(r[3],true)}</td></tr>`).join('')
   }</tbody></table>` : '<div class="empty">日次データはまだありません。</div>';
 }
+function refreshHold(){ const h = $('#hold'); if (h) h.outerHTML = holdCardHTML(BYID.get(h.dataset.id)); }
 function closeDetail(fromPop){
   const sh = $('#sheet'); if (sh.hidden) return;
   sh.hidden = true; document.body.style.overflow = '';
@@ -500,21 +588,43 @@ function route(){
   if (h.startsWith('fund-')) { if (META) openDetail(h.slice(5)); return; }
   closeDetail(true);
   state.tab = ['search','fav','rank'].includes(h) ? h : 'search';
-  state.limit = 50; render(); window.scrollTo(0,0);
+  state.limit = 50; state.reorder = false; render(); window.scrollTo(0,0);
 }
 window.addEventListener('hashchange', route);
 window.addEventListener('popstate', () => { if (!location.hash.startsWith('#fund-')) closeDetail(true); });
 
+function moveEntry(e, d){
+  const i = state.list.findIndex(x => x.e === e), j = i + d;
+  if (i < 0 || j < 0 || j >= state.list.length) return;
+  [state.list[i], state.list[j]] = [state.list[j], state.list[i]];
+  saveList(); render();
+  const b = document.querySelector(`[data-${d < 0 ? 'up' : 'down'}="${CSS.escape(e)}"]`); if (b) b.focus();
+}
 document.addEventListener('click', e => {
   const t = e.target.closest('button,[data-open]'); if (!t) return;
-  if (t.classList.contains('star')) { e.stopPropagation(); toggleFav(t.dataset.id); return; }
-  if (t.hasAttribute('data-holdsave')){
-    const id = $('#hold').dataset.id, h = readHoldInputs();
-    if (!h.amt || !h.cost){ $('#h-ok').textContent = '購入金額と買ったときの基準価額を、両方とも数字で入れてください。'; return; }
-    doSaveHold(id, h, false); return;
+  if (t.classList.contains('star')) { e.stopPropagation(); toggleFav(t.dataset.id); if (!$('#sheet').hidden) refreshHold(); return; }
+  if (t.dataset.up) { e.stopPropagation(); return moveEntry(t.dataset.up, -1); }
+  if (t.dataset.down) { e.stopPropagation(); return moveEntry(t.dataset.down, 1); }
+  if (t.hasAttribute('data-reorder')) {
+    state.reorder = !state.reorder;
+    if (state.reorder && state.favSort !== 'my') { state.favSort = 'my'; LS.set('favSort2', 'my'); }
+    return render();
+  }
+  if (t.hasAttribute('data-addhold')) {
+    const id = $('#hold').dataset.id;
+    const blank = entriesOf(id).find(x => !x.amt && !x.cost && !x.acct);
+    if (!blank || entriesOf(id).length === 0) state.list.push({e:newE(), id, acct:'', amt:null, cost:null});
+    saveList(); syncStars(id); refreshHold();
+    const forms = document.querySelectorAll('#hold .hf'); forms[forms.length-1]?.querySelector('.h-acct')?.focus();
+    return;
+  }
+  if (t.dataset.del) {
+    const en = entry(t.dataset.del); if (!en) return;
+    if (t.dataset.confirm !== '1' && (en.amt || en.acct)) { t.dataset.confirm = '1'; t.textContent = 'もう一度押すと削除'; return; }
+    state.list = state.list.filter(x => x.e !== en.e); saveList(); syncStars(en.id); refreshHold(); return;
   }
   if (t.hasAttribute('data-bkcopy')){
-    const code = 'TFN1:' + btoa(unescape(encodeURIComponent(JSON.stringify({f:[...state.fav], h:state.hold}))));
+    const code = 'TFN2:' + btoa(unescape(encodeURIComponent(JSON.stringify({l: state.list}))));
     $('#bk-text').value = code;
     const done = () => { $('#bk-msg').textContent = '✓ コピーしました。移したい先で貼り付けてください。'; };
     try{ navigator.clipboard.writeText(code).then(done, () => { $('#bk-text').select(); $('#bk-msg').textContent = 'コードを表示しました。長押しで全部選んでコピーしてください。'; }); }
@@ -523,37 +633,41 @@ document.addEventListener('click', e => {
   }
   if (t.hasAttribute('data-bkload')){
     try{
-      const raw = $('#bk-text').value.trim(); if (!raw.startsWith('TFN1:')) throw 0;
+      const raw = $('#bk-text').value.trim();
       const d = JSON.parse(decodeURIComponent(escape(atob(raw.slice(5)))));
-      (d.f || []).forEach(id => state.fav.add(id)); Object.assign(state.hold, d.h || {});
-      saveFav(); saveHold(); render(); $('#bk-msg') && ($('#bk-msg').textContent = '✓ 復元しました');
+      let add = [];
+      if (raw.startsWith('TFN2:')) add = d.l || [];
+      else if (raw.startsWith('TFN1:')) add = (d.f || []).map(id => ({e:newE(), id, acct:'', amt:d.h?.[id]?.amt||null, cost:d.h?.[id]?.cost||null}));
+      else throw 0;
+      const have = new Set(state.list.map(x => x.e));
+      add.forEach(x => { if (!have.has(x.e)) state.list.push(x); });
+      saveList(); render(); $('#bk-msg') && ($('#bk-msg').textContent = '✓ 復元しました');
     }catch{ $('#bk-msg').textContent = 'コードが正しくありません。全部コピーできているか確かめてください。'; }
     return;
   }
-  if (t.hasAttribute('data-holddel')){
-    const id = $('#hold').dataset.id; delete state.hold[id]; saveHold();
-    $('#hold').outerHTML = holdCardHTML(BYID.get(id)); return;
-  }
-  if (t.dataset.open) return openDetail(t.dataset.open);
+  if (t.dataset.open) { if (state.reorder) return; return openDetail(t.dataset.open); }
   if (t.hasAttribute('data-close')) return closeDetail(false);
   if (t.hasAttribute('data-more')) { state.limit += 100; return render(); }
-  if (t.dataset.nisa) { state.nisa = t.dataset.nisa; LS.set('nisa2', state.nisa); state.limit = 50; return render(); }
-  if (t.dataset.rank) { state.rank = t.dataset.rank; LS.set('rank', state.rank); state.limit = 50; render(); t.scrollIntoView?.({inline:'center',block:'nearest'}); return; }
-  if (t.dataset.favsort) { state.favSort = t.dataset.favsort; LS.set('favSort', state.favSort); return render(); }
 });
 document.addEventListener('input', e => {
-  if (e.target.id === 'h-amt' || e.target.id === 'h-cost'){
-    const id = $('#hold')?.dataset.id, f = BYID.get(id), h = readHoldInputs();
-    if (f) $('#h-res').innerHTML = holdResHTML(f, h);
-    clearTimeout(window.__hT);
-    window.__hT = setTimeout(() => { if (h.amt && h.cost) doSaveHold(id, h, true); }, 600);
-  }
+  const form = e.target.closest?.('.hf'); if (!form) return;
+  const en = entry(form.dataset.e); if (!en) return;
+  en.acct = form.querySelector('.h-acct').value.trim();
+  en.amt = toNum(form.querySelector('.h-amt').value);
+  en.cost = toNum(form.querySelector('.h-cost').value);
+  const f = BYID.get(en.id);
+  form.querySelector('.res').innerHTML = holdResHTML(f, en);
+  clearTimeout(form._t);
+  form._t = setTimeout(() => {
+    const ok = saveList();
+    form.querySelector('.saved').textContent = ok ? '✓ 自動で保存しました' : '保存できませんでした。プライベートモードをやめて、普通のSafariかホーム画面のアイコンから開いてください。';
+  }, 500);
 });
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'nisa') { state.nisa = t.value; LS.set('nisa2', state.nisa); state.limit = 50; render(); window.scrollTo(0,0); }
   else if (t.id === 'rank-kind') { state.rank = t.value; LS.set('rank', state.rank); state.limit = 50; render(); window.scrollTo(0,0); }
-  else if (t.id === 'favsort') { state.favSort = t.value; LS.set('favSort', state.favSort); render(); }
+  else if (t.id === 'favsort') { state.favSort = t.value; LS.set('favSort2', state.favSort); render(); }
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeDetail(false);
@@ -577,6 +691,10 @@ async function load(){
     $('#view').innerHTML = '<div class="list"><div class="empty">ファンドデータがまだ用意されていません。<br>更新後に表示されます。</div></div>';
     return;
   }
+  try{
+    const r = await fetch('indices.json?t=' + Date.now());
+    if (r.ok) IDX = ((await r.json()).items || []).map(x => ({...x, kind:'idx', _k: norm(x.name + ' ' + x.short + (x.id === 'idx-N225' ? ' 日経225 nikkei' : x.id === 'idx-GSPC' ? ' sp500 s&p エスアンドピー' : x.id === 'idx-IXIC' ? ' nasdaq' : x.id === 'idx-DJI' ? ' ダウ dow' : x.id === 'idx-USDJPY' ? ' 為替 ドル usd' : '')) }));
+  }catch{}
   const c = META.cols, ix = Object.fromEntries(c.map((k,i) => [k,i]));
   FUNDS = META.rows.map(r => {
     const f = { id:r[ix.id], name:r[ix.name], short:r[ix.short], nick:r[ix.nick], co:r[ix.co], na:r[ix.na], nav:r[ix.nav], navChg:r[ix.navChg],
@@ -586,7 +704,7 @@ async function load(){
     f._kn = norm(f.nick); f._k = norm([f.nick, f.short, f.name, f.co].join(' '));
     return f;
   });
-  BYID = new Map(FUNDS.map(f => [f.id, f]));
+  BYID = new Map([...FUNDS.map(f => [f.id, f]), ...IDX.map(x => [x.id, x])]);
   $('#asof').innerHTML = `基準日 <span class="num">${esc(META.asof)}</span>・${META.count.toLocaleString()}本<br>更新 <span class="num">${esc(META.updated.slice(5))}</span>`;
   route();
 }
