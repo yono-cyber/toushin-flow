@@ -80,6 +80,10 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .px .p small{font-size:11px;font-weight:500;color:var(--muted);margin-left:1px}
 .px .c{font-size:12.5px;margin-top:3px;font-weight:600}
 .px .r{font-size:11.5px}
+.px .hb{display:block;margin-top:6px;padding-top:5px;border-top:1px dashed var(--line)}
+.px .ha{display:block;font-size:11px;color:var(--muted)}
+.px .hp{display:block;font-size:14px;font-weight:700}
+.px .hr{display:block;font-size:11px}
 .val{text-align:right;line-height:1.3}
 .val .main{font-size:14px;font-weight:600}
 .val .sub{font-size:11.5px}
@@ -271,7 +275,7 @@ function yenDiff(v){ return v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '
 function priceHTML(f){
   return `<span class="px num"><span class="p">${f.nav==null?'—':Math.round(f.nav).toLocaleString('ja-JP')+'<small>円</small>'}</span>
     <span class="c ${cls(f.navChg)}" style="display:block">${f.navChg==null?'—':arrow(f.navChg)+' '+yenDiff(f.navDiff)}</span>
-    <span class="r ${cls(f.navChg)}" style="display:block">${pct(f.navChg)}</span></span>`;
+    <span class="r ${cls(f.navChg)}" style="display:block">${pct(f.navChg)}</span>${(() => { const c = holdCalc(f, state.hold[f.id]); return c ? `<span class="hb"><span class="ha">購入 ${Math.round(c.amt).toLocaleString('ja-JP')}円</span><span class="hp ${cls(c.pl)}">${yenS(c.pl)}</span><span class="hr ${cls(c.pl)}">${pct(c.plPct)}</span></span>` : ''; })()}</span>`;
 }
 function rowHTML(f, rank, metricLabel, metricHTML){
   const nick = f.nick ? esc(f.nick) : esc(f.short || f.name);
@@ -334,7 +338,6 @@ function viewFav(){
       <label class="sel cap-on" style="margin-bottom:8px"><span class="cap">並び替え</span><select id="favsort" aria-label="並び替え">${sorts.map(([k,l]) => `<option value="${k}"${state.favSort===k?' selected':''}>${l}</option>`).join('')}</select></label>
     ${arr.length ? listHTML(arr.map(f => {
       const hc = holdCalc(f, state.hold[f.id]);
-      if (hc && (state.favSort === 'pl' || state.favSort === 'na' || state.favSort === 'chg')) return rowHTML(f, null, '損益', `<span class="${cls(hc.pl)}">${yenS(hc.pl)}（${pct(hc.plPct)}）</span>`);
       const k = ['d1','w1','m1'].includes(state.favSort) ? state.favSort : null;
       const lbl = {d1:'日次流入', w1:'1週間流入', m1:'1ヶ月流入'}[k];
       return k ? rowHTML(f, null, lbl, `<span class="${cls(f[k])}">${money(f[k], true)}</span>`) : rowHTML(f, null, '純資産', money(f.na));
