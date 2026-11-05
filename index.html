@@ -323,8 +323,7 @@ function viewFav(){
   if (!state.fav.size && !Object.keys(state.hold).length) return `<div class="sect-h"><h2>お気に入り</h2></div><div class="list"><div class="empty">まだお気に入りがありません。<br>検索やランキングで ☆ を押すと、ここにまとめて表示されます。</div></div>${backupHTML()}`;
   const key = ({pl:f=>holdCalc(f,state.hold[f.id])?.pl, na:f=>f.na, chg:f=>f.navChg, d1:f=>f.d1, w1:f=>f.w1, m1:f=>f.m1})[state.favSort] || (f=>f.na);
   arr.sort((a,b) => (key(b) ?? -Infinity) - (key(a) ?? -Infinity));
-  const tot = k => arr.reduce((s,f) => s + (f[k] || 0), 0);
-  const sorts = [['pl','損益の大きい順'],['na','純資産の大きい順'],['chg','前日比（値上がり順）'],['d1','資金流入（日次）'],['w1','資金流入（1週間）'],['m1','資金流入（1ヶ月）']];
+    const sorts = [['pl','損益の大きい順'],['na','純資産の大きい順'],['chg','前日比（値上がり順）'],['d1','資金流入（日次）'],['w1','資金流入（1週間）'],['m1','資金流入（1ヶ月）']];
   const hs = arr.map(f => holdCalc(f, state.hold[f.id])).filter(Boolean);
   const T = hs.reduce((a,h) => ({amt:a.amt+h.amt, val:a.val+h.val, day:a.day+(h.day||0)}), {amt:0,val:0,day:0});
   const pf = hs.length ? `<div class="pf">
@@ -335,13 +334,7 @@ function viewFav(){
         <div><div class="label">評価額</div><div class="v num">${yen(T.val)}</div></div>
         <div><div class="label">前日比</div><div class="v num ${cls(T.day)}">${yenS(T.day)}</div></div>
       </div></div>` : `<p class="note" style="margin-top:0">ファンドの詳細画面で「購入金額」を入れると、ここに損益の合計が出ます。</p>`;
-  return `${pf}<div class="sum" style="margin-top:10px">
-      <div class="tile"><div class="label">合計純資産</div><div class="v num">${money(tot('na'))}</div></div>
-      <div class="tile"><div class="label">日次流入 計</div><div class="v num ${cls(tot('d1'))}">${money(tot('d1'),true)}</div></div>
-      <div class="tile"><div class="label">1週間流入 計</div><div class="v num ${cls(tot('w1'))}">${money(tot('w1'),true)}</div></div>
-      <div class="tile"><div class="label">1ヶ月流入 計</div><div class="v num ${cls(tot('m1'))}">${money(tot('m1'),true)}</div></div>
-    </div>
-    <div class="sect-h"><h2>お気に入り ${arr.length} 本</h2><span class="label">基準価額 / 前日比</span></div>
+  return `${pf}    <div class="sect-h"><h2>お気に入り ${arr.length} 本</h2><span class="label">基準価額 / 前日比</span></div>
       <label class="sel cap-on" style="margin-bottom:8px"><span class="cap">並び替え</span><select id="favsort" aria-label="並び替え">${sorts.map(([k,l]) => `<option value="${k}"${state.favSort===k?' selected':''}>${l}</option>`).join('')}</select></label>
     ${arr.length ? listHTML(arr.map(f => {
       const hc = holdCalc(f, state.hold[f.id]);
@@ -424,7 +417,7 @@ function holdCardHTML(f){
   return `<div class="hold" id="hold" data-id="${esc(f.id)}">
     <h3>購入金額から損益を見る</h3>
     <div class="inrow">
-      <label>購入金額（いくら分買ったか）<input id="h-amt" type="text" inputmode="numeric" autocomplete="off" placeholder="例 1,000,000" value="${h.amt ? Math.round(h.amt).toLocaleString('ja-JP') : ''}"></label>
+      <label>購入金額（合計）<input id="h-amt" type="text" inputmode="numeric" autocomplete="off" placeholder="例 1,000,000" value="${h.amt ? Math.round(h.amt).toLocaleString('ja-JP') : ''}"></label>
       <label>買ったときの基準価額<input id="h-cost" type="text" inputmode="numeric" autocomplete="off" placeholder="例 37,100" value="${h.cost ? Math.round(h.cost).toLocaleString('ja-JP') : ''}"></label>
     </div>
     <div class="res" id="h-res">${holdResHTML(f, h)}</div>
