@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f5f6f3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="投信ノート">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>投信フローノート</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
@@ -146,6 +152,8 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .dv-side{text-align:right}
 .dv-recv{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--accent-soft);font-size:13px}
 .dv-recv b{font-size:15px;white-space:nowrap}
+.save-st{font-size:12.5px;color:var(--muted);margin:2px 2px 10px;line-height:1.6}
+.save-st.warn{color:var(--fg);background:var(--up-soft);border:1px solid var(--up);border-radius:12px;padding:10px 12px;font-size:13.5px}
 .sum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:4px}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .tile .v{font-size:17px;font-weight:600;margin-top:2px}
@@ -235,6 +243,16 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const LS = { get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch{ return d; } },
              set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return JSON.stringify(JSON.parse(localStorage.getItem(k))) === JSON.stringify(v); }catch{ return false; } } };
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch{}
+// 予備の保存先（IndexedDB）。localStorage が消えても、ここから戻す
+const IDB = {
+  db: null,
+  open(){ return this.db || (this.db = new Promise((ok, ng) => { try{ const r = indexedDB.open('toushin-flow', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => ng(r.error); }catch(e){ ng(e); } })); },
+  async get(k){ try{ const d = await this.open(); return await new Promise(ok => { const q = d.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => ok(q.result); q.onerror = () => ok(undefined); }); }catch{ return undefined; } },
+  async set(k, v){ try{ const d = await this.open(); return await new Promise(ok => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => ok(true); t.onerror = () => ok(false); }); }catch{ return false; } }
+};
+const INAPP = /Line\/|FBAN|FBAV|Instagram|MicroMessenger|KAKAOTALK/i.test(navigator.userAgent);
+const STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+let saveStatus = { ok: null, at: null };
 
 let FUNDS = [], IDX = [], BYID = new Map(), META = null;
 const newE = () => 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -314,6 +332,8 @@ function nisaOk(f){ if (state.nisa === 'fund') return !f.etf; return state.nisa 
 let favDoc = null, favTimer = null;
 function saveList(){
   const ok = LS.set('list', state.list);
+  const at = Date.now(); LS.set('listAt', at);
+  IDB.set('list', {list: state.list, at}).then(ok2 => { saveStatus = { ok: ok || ok2, at }; const el = document.getElementById('save-st'); if (el) el.outerHTML = saveStatusHTML(); });
   if (favDoc){ clearTimeout(favTimer); favTimer = setTimeout(() => { favDoc.set({list: state.list, at: Date.now()}).catch(()=>{}); }, 400); }
   return ok;
 }
@@ -379,7 +399,7 @@ function score(f, q){
 }
 function viewFav(){
   const items = state.list.map(en => ({en, f: BYID.get(en.id)})).filter(x => x.f);
-  if (!items.length) return `<div class="sect-h"><h2>お気に入り</h2></div><div class="list"><div class="empty">まだお気に入りがありません。<br>検索・指数・ランキングで ☆ を押すと、ここにまとめて表示されます。</div></div>${backupHTML()}`;
+  if (!items.length) return `${saveStatusHTML()}<div class="sect-h"><h2>お気に入り</h2></div><div class="list"><div class="empty">まだお気に入りがありません。<br>検索・指数・ランキングで ☆ を押すと、ここにまとめて表示されます。</div></div>${backupHTML()}`;
   const sorts = [['my','自分の並び順'],['pl','損益の大きい順'],['chg','前日比（値上がり順）'],['na','純資産の大きい順']];
   const key = ({pl:x=>holdCalc(x.f,x.en)?.pl, chg:x=>x.f.kind==='idx'?x.f.chgPct:x.f.navChg, na:x=>x.f.na})[state.favSort];
   const arr = key && !state.reorder ? items.slice().sort((a,b) => (key(b) ?? -Infinity) - (key(a) ?? -Infinity)) : items;
@@ -397,7 +417,7 @@ function viewFav(){
     ? `<div class="reo-bar"><span>▲▼で並びを変えて「完了」を押してください</span><button type="button" class="done" data-reorder>完了</button></div>`
     : `<div class="fav-ctrl"><label class="sel cap-on"><span class="cap">並び替え</span><select id="favsort" aria-label="並び替え">${sorts.map(([k,l]) => `<option value="${k}"${state.favSort===k?' selected':''}>${l}</option>`).join('')}</select></label>
        <button type="button" class="reo" data-reorder>並びを変える</button></div>`;
-  return `${pf}<div class="sect-h"><h2>お気に入り ${items.length} 件</h2><span class="label">基準価額 / 前日比</span></div>${ctrl}
+  return `${saveStatusHTML()}${pf}<div class="sect-h"><h2>お気に入り ${items.length} 件</h2><span class="label">基準価額 / 前日比</span></div>${ctrl}
     ${listHTML(arr.map(x => x.f.kind === 'idx' ? rowHTML(x.f, null, null, null, x.en) : rowHTML(x.f, null, null, null, x.en)))}
     ${backupHTML()}`;
 }
@@ -496,6 +516,13 @@ function lineSVG(ser, dec){
 }
 function shortMoney(m){ const a = Math.abs(m); const s = m < 0 ? '−' : ''; return a >= 100 ? s + (a/100).toFixed(a >= 1000 ? 0 : 1) + '億' : s + Math.round(a) + '百万'; }
 
+function saveStatusHTML(){
+  const n = state.list.length;
+  const warn = INAPP ? '<b>LINEなどアプリの中のブラウザで開いています。</b>この画面では保存が消えることがあります。右下（または右上）のメニューから「Safariで開く」を選び、Safariの共有ボタン →「ホーム画面に追加」で作ったアイコンから使ってください。'
+    : saveStatus.ok === false ? '<b>このブラウザでは保存できていません。</b>プライベートブラウズをやめて、普通のSafariか、ホーム画面のアイコンから開いてください。' : '';
+  const t = saveStatus.at ? new Date(saveStatus.at).toLocaleString('ja-JP', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+  return `<p class="save-st${warn ? ' warn' : ''}" id="save-st">${warn || `✓ お気に入り ${n} 件はこのスマホに自動で保存されています${t ? `（最終保存 ${t}）` : ''}。`}</p>`;
+}
 function backupHTML(){
   return `<details class="bk"><summary>データの引き継ぎ（別のスマホ・別のブラウザへ）</summary>
     <p class="note">お気に入りと購入金額は、開いているスマホ・ブラウザの中に保存されます。別の開き方（Safariとホーム画面のアイコンなど）に移すときは、元の画面でコードをコピーして、移した先で貼り付けてください。</p>
@@ -734,7 +761,20 @@ async function load(){
   $('#asof').innerHTML = `基準日 <span class="num">${esc(META.asof)}</span>・${META.count.toLocaleString()}本<br>更新 <span class="num">${esc(META.updated.slice(5))}</span>`;
   route();
 }
-render(); load();
+async function restoreFromIDB(){
+  const d = await IDB.get('list');
+  const lsAt = LS.get('listAt', 0);
+  if (d && Array.isArray(d.list) && (state.list.length === 0 || (d.at || 0) > lsAt)) {
+    const have = new Set(state.list.map(x => x.e));
+    let added = 0;
+    d.list.forEach(x => { if (!have.has(x.e)) { state.list.push(x); added++; } });
+    if (added) { LS.set('list', state.list); render(); }
+  }
+  if (state.list.length) { saveStatus = { ok: LS.get('list', null) !== null, at: Math.max(lsAt || 0, d?.at || 0) || null }; IDB.set('list', {list: state.list, at: saveStatus.at || Date.now()}); }
+  if (state.tab === 'fav' && $('#sheet').hidden) render();
+}
+if (INAPP) setTimeout(() => toast('LINEなどの中で開いています。お気に入りが消えることがあるので、Safariで開いてください。'), 1500);
+render(); load(); restoreFromIDB();
 })();
 </script>
 
