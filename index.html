@@ -141,6 +141,11 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .hold .add{width:100%;min-height:46px;border-radius:12px;border:1.5px dashed var(--accent);background:var(--surface);color:var(--fg);font-weight:700;cursor:pointer;margin-top:2px}
 .hf .saved{margin:6px 0 0;font-size:13px;font-weight:700;color:var(--accent);min-height:1.1em}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 12px);z-index:40;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:13.5px;max-width:calc(100% - 32px);box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.dv-top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.dv-big{font-size:28px;font-weight:600;line-height:1.2}
+.dv-side{text-align:right}
+.dv-recv{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--accent-soft);font-size:13px}
+.dv-recv b{font-size:15px;white-space:nowrap}
 .sum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:4px}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .tile .v{font-size:17px;font-weight:600;margin-top:2px}
@@ -439,6 +444,25 @@ async function loadSeries(id){
   if (!SERIES) SERIES = fetch(`series.json?v=${encodeURIComponent(META.updated)}`).then(r => r.ok ? r.json() : {}).catch(() => ({}));
   return (await SERIES)[id] || [];
 }
+let DIVS = null;
+function loadDivs(){ if (!DIVS) DIVS = fetch(`divs.json?v=${encodeURIComponent(META.updated)}`).then(r => r.ok ? r.json() : {}).catch(() => ({})); return DIVS; }
+const FQ = {'001':'年1回','002':'年2回','004':'年4回（3ヶ月ごと）','006':'年6回（隔月）','012':'年12回（毎月）','365':'毎日'};
+function divCardHTML(f, d){
+  const h = (d && d.h) || [];
+  const fq = d && d.fq && /^\d+$/.test(d.fq) ? (FQ[d.fq] || ('年' + parseInt(d.fq, 10) + '回')) : '';
+  if (!h.length || !h.some(x => x[1] > 0)) return `<h3>分配金</h3><p class="note" style="margin:0">直近の分配金はありません（分配なし）。${fq ? '決算 ' + fq + '。' : ''}</p>`;
+  const last = h[0];
+  const cut = new Date(new Date(last[0]).getTime() - 365*864e5).toISOString().slice(0,10);
+  const y1 = d.y1 != null ? d.y1 : h.filter(x => x[0] > cut).reduce((a,x) => a + x[1], 0);
+  const mine = entriesOf(f.id).map(en => ({en, u: en.amt && en.cost ? en.amt / en.cost : null})).filter(x => x.u);
+  const recv = mine.length ? mine.map(x => `<div class="dv-recv"><span>${esc(acctLabel(x.en) || '保有分')}の受け取り（目安・税引前）</span><b class="num">約 ${yen(x.u * last[1])}</b></div>`).join('') : '';
+  return `<h3>分配金</h3>
+    <div class="dv-top"><div><div class="label">直近の分配金（1万口あたり）</div><div class="dv-big num">${yen(last[1])}</div><div class="label">${esc(last[0].replace(/-/g,'/'))} 決算</div></div>
+      <div class="dv-side"><div class="label">過去1年の合計</div><div class="num" style="font-weight:600;font-size:16px">${yen(y1)}</div>${fq ? `<div class="label" style="margin-top:4px">決算 ${fq}</div>` : ''}</div></div>
+    ${recv}
+    <div class="tbl" style="margin-top:8px"><table><thead><tr><th>決算日</th><th>分配金</th></tr></thead><tbody>${h.map(x => `<tr><td class="num">${esc(x[0].replace(/-/g,'/'))}</td><td class="num">${yen(x[1])}</td></tr>`).join('')}</tbody></table></div>
+    <p class="note" style="margin-top:6px">分配金は1万口あたりの金額です。分配が出た日は、その分だけ基準価額が下がります。</p>`;
+}
 function flowCard(label, v, note){
   return `<div class="flow ${v>0?'pos':v<0?'neg':''}"><div class="label">${label}</div><div class="v num ${cls(v)}">${money(v,true)}</div>${note?`<div class="n">${note}</div>`:''}</div>`;
 }
@@ -549,6 +573,7 @@ async function openDetail(id){
       <div class="na"><span class="label">純資産総額</span><b class="num">${money(f.na)}</b></div>
       <div class="meta"><span>1年騰落率 <b class="num ${cls(f.r1y)}">${pct(f.r1y)}</b></span></div>
     </div>
+    <div class="card" id="d-div"><h3>分配金</h3><div class="loading" style="padding:10px 0">読み込み中…</div></div>
     ${holdCardHTML(f)}
     <div class="flows">
       ${flowCard('日次の資金流入', f.d1, '直近1営業日')}
@@ -566,6 +591,7 @@ async function openDetail(id){
     </dl>${f.url ? `<p class="note"><a href="${esc(f.url)}" target="_blank" rel="noopener">運用会社の資料を開く</a></p>` : ''}</div>
     <p class="note">資金流入は「当日の純資産 − 前日の純資産 × 当日の基準価額 ÷ 前日の基準価額」で推計しています（分配金の支払いは流出に含めません）。データ元：投資信託協会 投信総合検索ライブラリー。</p>`, f.id);
   const sh = $('#sheet');
+  loadDivs().then(d => { const el = $('#d-div'); if (el && !sh.hidden) el.innerHTML = divCardHTML(f, d[id]); });
   const ser = await loadSeries(id);
   if (sh.hidden) return;
   $('#d-chart').innerHTML = chartSVG(ser);
