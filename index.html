@@ -153,6 +153,7 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .dv-recv{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--accent-soft);font-size:13px}
 .dv-recv b{font-size:15px;white-space:nowrap}
 .save-st{font-size:12.5px;color:var(--muted);margin:2px 2px 10px;line-height:1.6}
+.save-st .ver{opacity:.6;font-size:11px}
 .save-st.warn{color:var(--fg);background:var(--up-soft);border:1px solid var(--up);border-radius:12px;padding:10px 12px;font-size:13.5px}
 .sum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:4px}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
@@ -248,11 +249,20 @@ const IDB = {
   db: null,
   open(){ return this.db || (this.db = new Promise((ok, ng) => { try{ const r = indexedDB.open('toushin-flow', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => ng(r.error); }catch(e){ ng(e); } })); },
   async get(k){ try{ const d = await this.open(); return await new Promise(ok => { const q = d.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => ok(q.result); q.onerror = () => ok(undefined); }); }catch{ return undefined; } },
-  async set(k, v){ try{ const d = await this.open(); return await new Promise(ok => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => ok(true); t.onerror = () => ok(false); }); }catch{ return false; } }
+  async set(k, v){ try{ const d = await this.open(); return await new Promise(ok => { let t; try{ t = d.transaction('kv', 'readwrite', {durability:'strict'}); }catch{ t = d.transaction('kv', 'readwrite'); } t.objectStore('kv').put(v, k); t.oncomplete = () => ok(true); t.onerror = () => ok(false); }); }catch{ return false; } }
 };
 const INAPP = /Line\/|FBAN|FBAV|Instagram|MicroMessenger|KAKAOTALK/i.test(navigator.userAgent);
 const STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 let saveStatus = { ok: null, at: null };
+const APPVER = '11/7版';
+// 3つ目の保存先（Cookie）。iPhoneでアプリを強制終了しても残りやすい
+const CK = {
+  enc(list){ return btoa(unescape(encodeURIComponent(JSON.stringify(list.map(x => [x.e, x.id, x.acct || '', x.amt || 0, x.cost || 0]))))); },
+  dec(s){ return JSON.parse(decodeURIComponent(escape(atob(s)))).map(a => ({e:a[0], id:a[1], acct:a[2], amt:a[3] || null, cost:a[4] || null})); },
+  set(list, at){ try{ const v = this.enc(list); if (v.length > 3600) return false; const p = location.pathname.replace(/[^/]*$/, '');
+    document.cookie = `tfl=${v}; max-age=34560000; path=${p}; SameSite=Lax; Secure`; document.cookie = `tflat=${at}; max-age=34560000; path=${p}; SameSite=Lax; Secure`; return true; }catch{ return false; } },
+  get(){ try{ const m = document.cookie.match(/(?:^|; )tfl=([^;]*)/), t = document.cookie.match(/(?:^|; )tflat=([^;]*)/); return m ? {list: this.dec(m[1]), at: t ? +t[1] : 0} : null; }catch{ return null; } }
+};
 
 let FUNDS = [], IDX = [], BYID = new Map(), META = null;
 const newE = () => 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -332,7 +342,7 @@ function nisaOk(f){ if (state.nisa === 'fund') return !f.etf; return state.nisa 
 let favDoc = null, favTimer = null;
 function saveList(){
   const ok = LS.set('list', state.list);
-  const at = Date.now(); LS.set('listAt', at);
+  const at = Date.now(); LS.set('listAt', at); CK.set(state.list, at);
   IDB.set('list', {list: state.list, at}).then(ok2 => { saveStatus = { ok: ok || ok2, at }; const el = document.getElementById('save-st'); if (el) el.outerHTML = saveStatusHTML(); });
   if (favDoc){ clearTimeout(favTimer); favTimer = setTimeout(() => { favDoc.set({list: state.list, at: Date.now()}).catch(()=>{}); }, 400); }
   return ok;
@@ -521,7 +531,7 @@ function saveStatusHTML(){
   const warn = INAPP ? '<b>LINEなどアプリの中のブラウザで開いています。</b>この画面では保存が消えることがあります。右下（または右上）のメニューから「Safariで開く」を選び、Safariの共有ボタン →「ホーム画面に追加」で作ったアイコンから使ってください。'
     : saveStatus.ok === false ? '<b>このブラウザでは保存できていません。</b>プライベートブラウズをやめて、普通のSafariか、ホーム画面のアイコンから開いてください。' : '';
   const t = saveStatus.at ? new Date(saveStatus.at).toLocaleString('ja-JP', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
-  return `<p class="save-st${warn ? ' warn' : ''}" id="save-st">${warn || `✓ お気に入り ${n} 件はこのスマホに自動で保存されています${t ? `（最終保存 ${t}）` : ''}。`}</p>`;
+  return `<p class="save-st${warn ? ' warn' : ''}" id="save-st">${warn || (n ? `✓ お気に入り ${n} 件はこのスマホに自動で保存されています${t ? `（最終保存 ${t}）` : ''}。` : 'お気に入りは、このスマホに自動で保存されます。')}<span class="ver"> ${APPVER}</span></p>`;
 }
 function backupHTML(){
   return `<details class="bk"><summary>データの引き継ぎ（別のスマホ・別のブラウザへ）</summary>
@@ -762,17 +772,23 @@ async function load(){
   route();
 }
 async function restoreFromIDB(){
-  const d = await IDB.get('list');
+  const d = await IDB.get('list'), c = CK.get();
   const lsAt = LS.get('listAt', 0);
-  if (d && Array.isArray(d.list) && (state.list.length === 0 || (d.at || 0) > lsAt)) {
-    const have = new Set(state.list.map(x => x.e));
-    let added = 0;
-    d.list.forEach(x => { if (!have.has(x.e)) { state.list.push(x); added++; } });
-    if (added) { LS.set('list', state.list); render(); }
-  }
-  if (state.list.length) { saveStatus = { ok: LS.get('list', null) !== null, at: Math.max(lsAt || 0, d?.at || 0) || null }; IDB.set('list', {list: state.list, at: saveStatus.at || Date.now()}); }
+  // 一番新しく保存された場所の内容を使う
+  const cands = [{list: state.list, at: state.list.length ? lsAt : -1}];
+  if (d && Array.isArray(d.list)) cands.push({list: d.list, at: d.at || 0});
+  if (c && Array.isArray(c.list)) cands.push({list: c.list, at: c.at || 0});
+  cands.sort((a,b) => b.at - a.at);
+  const best = cands.find(x => x.list.length) || cands[0];
+  if (best && best.list !== state.list && best.at > lsAt) { state.list = best.list.slice(); LS.set('list', state.list); LS.set('listAt', best.at); render(); }
+  const dd = d;
+  if (state.list.length) { const at = Math.max(LS.get('listAt', 0) || 0, dd?.at || 0, c?.at || 0) || Date.now(); saveStatus = { ok: true, at }; IDB.set('list', {list: state.list, at}); CK.set(state.list, at); }
   if (state.tab === 'fav' && $('#sheet').hidden) render();
 }
+// アプリを閉じる・切り替える直前にもう一度保存
+const flush = () => { try{ if (state.list.length || LS.get('listAt', 0)) { const at = LS.get('listAt', 0) || Date.now(); LS.set('list', state.list); IDB.set('list', {list: state.list, at}); CK.set(state.list, at); } }catch{} };
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+window.addEventListener('pagehide', flush);
 if (INAPP) setTimeout(() => toast('LINEなどの中で開いています。お気に入りが消えることがあるので、Safariで開いてください。'), 1500);
 render(); load(); restoreFromIDB();
 })();
