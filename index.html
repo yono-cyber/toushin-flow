@@ -254,7 +254,7 @@ const IDB = {
 const INAPP = /Line\/|FBAN|FBAV|Instagram|MicroMessenger|KAKAOTALK/i.test(navigator.userAgent);
 const STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 let saveStatus = { ok: null, at: null };
-const APPVER = '11/7版';
+const APPVER = '11/8版';
 // 3つ目の保存先（Cookie）。iPhoneでアプリを強制終了しても残りやすい
 const CK = {
   enc(list){ return btoa(unescape(encodeURIComponent(JSON.stringify(list.map(x => [x.e, x.id, x.acct || '', x.amt || 0, x.cost || 0]))))); },
@@ -618,7 +618,7 @@ async function openDetail(id){
       ${flowCard('1ヶ月の資金流入', f.m1, '直近1ヶ月の合計')}
       ${flowCard('前月の設定−解約', f.mOff, '協会公表の月次実績')}
     </div>
-    <div class="card chart"><h3>日ごとの資金流入</h3><div id="d-chart"><div class="loading">読み込み中…</div></div></div>
+    <div class="card chart"><h3>基準価額の推移</h3><div id="d-chart"><div class="loading">読み込み中…</div></div></div>
     <div class="card"><h3>日次データ</h3><div class="tbl" id="d-table"><div class="loading">読み込み中…</div></div></div>
     <div class="card"><h3>ファンド情報</h3><dl class="kv">
       <dt>運用会社</dt><dd>${esc(f.co)}</dd>
@@ -631,7 +631,7 @@ async function openDetail(id){
   loadDivs().then(d => { const el = $('#d-div'); if (el && !sh.hidden) el.innerHTML = divCardHTML(f, d[id]); });
   const ser = await loadSeries(id);
   if (sh.hidden) return;
-  $('#d-chart').innerHTML = chartSVG(ser);
+  $('#d-chart').innerHTML = lineSVG(ser, 0);
   const rows = ser.slice().reverse();
   $('#d-table').innerHTML = rows.length ? `<table><thead><tr><th>日付</th><th>基準価額</th><th>純資産</th><th>資金流入</th></tr></thead><tbody>${
     rows.map(r => `<tr><td class="num">${r[0].slice(5).replace('-','/')}</td><td class="num">${yen(r[1])}</td><td class="num">${money(r[2])}</td><td class="num ${cls(r[3])}">${r[3]==null?'—':money(r[3],true)}</td></tr>`).join('')
